@@ -1,0 +1,33 @@
+from google.cloud import bigquery
+import json
+
+# Initialize BigQuery client
+client = bigquery.Client()
+
+# Define your initial query
+initial_query = "SELECT * FROM your_dataset.your_table WHERE your_condition"
+
+# Execute the initial query
+query_job = client.query(initial_query)
+
+# Iterate through the result rows
+for row in query_job:
+    # Extract data needed for new queries
+    extracted_data = row['column_name']
+
+    # Create a new query using the extracted data
+    new_query = f"SELECT * FROM your_dataset.another_table WHERE column_name = '{extracted_data}'"
+
+    # Execute the new query and fetch additional data
+    new_query_job = client.query(new_query)
+    new_row = new_query_job.fetchone()
+
+    # Enrich the original row with new data
+    row['new_data'] = new_row['new_column']
+
+    # Convert the enriched row to a JSON object
+    json_data = json.dumps(row, default=str)
+
+    # Save the JSON object as a file
+    with open(f'output_{row["id"]}.json', 'w') as json_file:
+        json.dump(json_data, json_file, indent=4)
