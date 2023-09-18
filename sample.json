@@ -1,0 +1,40 @@
+[
+    {
+        "id": 1,
+        "body": "First Item",
+        "severity": 1,
+        "status": 0,
+        "cfs": {
+            "latest": [
+                {
+                    "pheder": {
+                        "key": "abc"
+                    },
+                    "rawFields": {
+                        "crn": "123",
+                        "dofp": "12/05/2023"
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "id": 2,
+        "body": "Second Item",
+        "severity": 2,
+        "status": 3,
+        "cfs": {
+            "latest": [
+                {
+                    "pheder": {
+                        "key": "xyz"
+                    },
+                    "rawFields": {
+                        "crn": "456",
+                        "dofp": "12/05/2024"
+                    }
+                }
+            ]
+        }
+    }
+]
