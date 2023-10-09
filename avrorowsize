@@ -1,0 +1,42 @@
+import fastavro
+import os
+
+# Path to your Avro file
+avro_file_path = 'your_avro_file.avro'
+
+# Function to calculate the size of a Python object in bytes
+def get_size(obj, seen=None):
+    if seen is None:
+        seen = set()
+    size = 0
+    if id(obj) in seen:
+        return size
+    seen.add(id(obj))
+    if isinstance(obj, (int, float, bool, str, bytes)):
+        size += sys.getsizeof(obj)
+    elif isinstance(obj, (list, tuple, set, frozenset)):
+        size += sys.getsizeof(obj)
+        size += sum(get_size(item, seen) for item in obj)
+    elif isinstance(obj, dict):
+        size += sys.getsizeof(obj)
+        size += sum(get_size(k, seen) + get_size(v, seen) for k, v in obj.items())
+    elif hasattr(obj, '__dict__'):
+        size += get_size(obj.__dict__, seen)
+    elif hasattr(obj, '__slots__'):
+        size += sum(get_size(getattr(obj, slot), seen) for slot in obj.__slots__)
+    return size
+
+# Function to print rows with size greater than 500MB
+def print_large_rows(avro_file_path):
+    with open(avro_file_path, 'rb') as avro_file:
+        reader = fastavro.reader(avro_file)
+        for row in reader:
+            row_size = get_size(row)
+            if row_size > 500 * 1024 * 1024:  # 500MB in bytes
+                print(f"Row Size: {row_size} bytes")
+
+if __name__ == "__main__":
+    if os.path.exists(avro_file_path):
+        print_large_rows(avro_file_path)
+    else:
+        print(f"File '{avro_file_path}' not found.")
