@@ -1,0 +1,21 @@
+from google.cloud import storage
+
+def list_gcs_files(bucket_name):
+    # Initialize a GCS client
+    storage_client = storage.Client()
+
+    # Get the bucket object
+    bucket = storage_client.get_bucket(bucket_name)
+
+    # List all blobs (files) in the bucket
+    blobs = bucket.list_blobs()
+
+    # Print the names of the blobs
+    for blob in blobs:
+        print(f"File name: {blob.name}")
+
+if __name__ == "__main__":
+    # Replace 'your-bucket-name' with the name of your GCS bucket
+    bucket_name = "your-bucket-name"
+    
+    list_gcs_files(bucket_name)
