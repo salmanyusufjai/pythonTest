@@ -1,10 +1,7 @@
+from google.cloud import storage
 import fastavro
-import os
+import sys
 
-# Path to your Avro file
-avro_file_path = 'your_avro_file.avro'
-
-# Function to calculate the size of a Python object in bytes
 def get_size(obj, seen=None):
     if seen is None:
         seen = set()
@@ -26,17 +23,34 @@ def get_size(obj, seen=None):
         size += sum(get_size(getattr(obj, slot), seen) for slot in obj.__slots__)
     return size
 
-# Function to print rows with size greater than 500MB
-def print_large_rows(avro_file_path):
-    with open(avro_file_path, 'rb') as avro_file:
+def read_avro_from_gcs(bucket_name, avro_blob_name):
+    # Initialize a GCS client
+    storage_client = storage.Client()
+
+    # Get the bucket object
+    bucket = storage_client.get_bucket(bucket_name)
+
+    # Get the blob (Avro file) from the bucket
+    blob = bucket.blob(avro_blob_name)
+
+    # Download the Avro file to a local temporary file
+    temp_file = "/tmp/temp_avro_file.avro"  # You can change the path as needed
+    blob.download_to_filename(temp_file)
+
+    # Open and read the Avro file
+    with open(temp_file, 'rb') as avro_file:
         reader = fastavro.reader(avro_file)
         for row in reader:
             row_size = get_size(row)
             if row_size > 500 * 1024 * 1024:  # 500MB in bytes
                 print(f"Row Size: {row_size} bytes")
+                print(row)  # Print the entire row
 
 if __name__ == "__main__":
-    if os.path.exists(avro_file_path):
-        print_large_rows(avro_file_path)
-    else:
-        print(f"File '{avro_file_path}' not found.")
+    # Replace 'your-bucket-name' with the name of your GCS bucket
+    bucket_name = "your-bucket-name"
+    
+    # Replace 'your-avro-blob-name' with the name of the Avro blob in the bucket
+    avro_blob_name = "your-avro-blob-name"
+    
+    read_avro_from_gcs(bucket_name, avro_blob_name)
