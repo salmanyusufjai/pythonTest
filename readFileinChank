@@ -1,0 +1,12 @@
+def read_large_file(file_path, chunk_size=1024):
+    with open(file_path, 'rb') as file:
+        while True:
+            chunk = file.read(chunk_size)
+            if not chunk:
+                break  # End of file
+            # Process or print the chunk here
+            print(chunk.decode('utf-8'))  # Print the chunk (assuming it's text data)
+
+if __name__ == "__main__":
+    file_path = "large_file.txt"  # Replace with the path to your large file
+    read_large_file(file_path)
