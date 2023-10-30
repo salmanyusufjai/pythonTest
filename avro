@@ -1,0 +1,38 @@
+import fastavro
+import json
+import base64
+
+# Define a custom serialization function
+def custom_serialize(avro_record):
+    serialized_record = {}
+    for key, value in avro_record.items():
+        if isinstance(value, bytes):
+            serialized_record[key] = base64.b64encode(value).decode('utf-8')
+        elif isinstance(value, dict):
+            serialized_record[key] = custom_serialize(value)
+        elif isinstance(value, list):
+            serialized_record[key] = [custom_serialize(item) if isinstance(item, dict) else item for item in value]
+        else:
+            serialized_record[key] = value
+    return serialized_record
+
+# Define the Avro and JSON file paths
+avro_file_path = "your_avro_file.avro"
+json_file_path = "output.json"
+
+# Open the Avro file for reading and the JSON file for writing
+with open(avro_file_path, "rb") as avro_file, open(json_file_path, "w") as json_file:
+    avro_reader = fastavro.reader(avro_file)
+
+    # Initialize an empty list to store the JSON records
+    json_records = []
+
+    for record in avro_reader:
+        # Use the custom serialization function to convert the Avro record to JSON
+        json_record = custom_serialize(record)
+        json_records.append(json_record)
+
+    # Write the list of JSON records to the JSON file
+    json.dump(json_records, json_file, indent=2)
+
+print(f"Converted Avro data to JSON and saved it in '{json_file_path}'.")
