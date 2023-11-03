@@ -1,0 +1,27 @@
+def is_digit(value):
+    if value is not None and isinstance(value, str):
+        # Check if it's not an empty string
+        if value.strip():
+            # Check if it's a digit
+            if value.isdigit():
+                return True
+            # Check for negative integers or floats with optional '-' at the end
+            if (value[0] == '-' or value[-1] == '-') and value[1:-1].replace('.', '', 1).isdigit():
+                return True
+            # Check for floats
+            try:
+                float_value = float(value)
+                return True
+            except ValueError:
+                pass
+
+    return False
+
+# Test cases
+print(is_digit("123"))       # True
+print(is_digit("-123"))      # True
+print(is_digit("123.45"))    # True
+print(is_digit("-123.45-"))   # True
+print(is_digit("abc"))       # False
+print(is_digit(""))           # False
+print(is_digit(None))         # False
