@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Define Nexus repository URL and package name
+NEXUS_URL="https://your-nexus-repo-url/repository/your-repo/"
+PACKAGE_NAME="your-package.rpm"
+
+# Get the latest version of the package
+latest_version=$(curl -s "${NEXUS_URL}${PACKAGE_NAME}?describe=versions" | jq -r '.items | max_by(.version) | .version')
+
+if [ -z "$latest_version" ]; then
+  echo "Failed to retrieve the latest version."
+  exit 1
+fi
+
+# Download the latest version of the package
+curl -o "$PACKAGE_NAME" "${NEXUS_URL}${PACKAGE_NAME}?version=${latest_version}"
