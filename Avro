@@ -1,0 +1,24 @@
+import avro.schema
+from avro.datafile import DataFileReader
+from avro.io import DatumReader
+
+# Open the Avro JSON file
+avro_file = open('your_avro.json', 'rb')
+
+# Create a DataFileReader
+reader = DataFileReader(avro_file, DatumReader())
+
+# Get the Avro schema
+avro_schema = reader.meta['avro.schema']
+
+# Parse the Avro schema
+parsed_schema = avro.schema.parse(avro_schema)
+
+# Extract the field names
+field_names = [field.name for field in parsed_schema.fields]
+
+# Print the list of field names
+print(field_names)
+
+# Close the Avro file
+avro_file.close()p
