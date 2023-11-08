@@ -1,0 +1,25 @@
+import json
+
+# Open the Avro JSON file
+with open('your_avro.json', 'r') as avro_file:
+    data = json.load(avro_file)
+
+# Get the Avro schema from the JSON
+avro_schema = data.get("schema")
+
+# Parse the Avro schema
+parsed_schema = json.loads(avro_schema)
+
+# Extract the field names
+field_names = []
+
+# Look for fields encoded as a long followed by bytes
+for field in parsed_schema["fields"]:
+    field_type = field.get("type")
+
+    # Check if the field is a long followed by bytes
+    if isinstance(field_type, list) and field_type[0] == "long" and field_type[1] == "bytes":
+        field_names.append(field["name"])
+
+# Print the list of field names
+print(field_names)
