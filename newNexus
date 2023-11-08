@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Define Nexus repository URL and JAR filename
+NEXUS_URL="https://nexus.example.com/repository/my-repo/"
+JAR_FILENAME="my-app-latest.jar"
+
+# Get the latest version of the JAR
+latest_version=$(curl -s "${NEXUS_URL}" | grep -oP 'href="\K[^"]+(?=/)')
+
+if [ -z "$latest_version" ]; then
+  echo "Failed to retrieve the latest version."
+  exit 1
+fi
+
+# Download the latest version of the JAR
+curl -o "$JAR_FILENAME" "${NEXUS_URL}${latest_version}/$JAR_FILENAME"
+
+echo "Downloaded the latest version: $latest_version"
