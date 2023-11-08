@@ -1,0 +1,29 @@
+import json
+
+def extract_all_fields(schema):
+    field_names = []
+
+    def extract_fields_recursive(schema):
+        if "type" in schema:
+            if schema["type"] == "record" and "fields" in schema:
+                for field in schema["fields"]:
+                    field_names.append(field["name"])
+                    if "type" in field:
+                        extract_fields_recursive(field)
+            elif schema["type"] == "array" and "items" in schema:
+                extract_fields_recursive(schema["items"])
+            elif schema["type"] == "map" and "values" in schema:
+                extract_fields_recursive(schema["values"])
+
+    extract_fields_recursive(schema)
+    return field_names
+
+# Open the Avro schema JSON file
+with open('your_schema.json', 'r') as schema_file:
+    schema_data = json.load(schema_file)
+
+# Extract all field names, including nested fields
+field_names = extract_all_fields(schema_data)
+
+# Print the list of all field names
+print(field_names)
