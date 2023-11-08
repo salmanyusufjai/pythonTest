@@ -1,0 +1,35 @@
+import json
+
+def extract_field_info(schema, prefix=''):
+    field_info = []
+
+    if "type" in schema:
+        # Handle nested types
+        if isinstance(schema["type"], list):
+            for item in schema["type"]:
+                field_info += extract_field_info(item, prefix)
+        elif schema["type"] == "record" and "fields" in schema:
+            for field in schema["fields"]:
+                field_name = prefix + field["name"]
+                field_type = field["type"]
+                field_info.append((field_name, field_type))
+                if isinstance(field_type, dict):
+                    # Handle nested fields
+                    field_info += extract_field_info(field_type, field_name + '.')
+        elif schema["type"] == "array" and "items" in schema:
+            field_info += extract_field_info(schema["items"], prefix)
+        elif schema["type"] == "map" and "values" in schema:
+            field_info += extract_field_info(schema["values"], prefix)
+
+    return field_info
+
+# Open the Avro schema JSON file
+with open('your_schema.json', 'r') as schema_file:
+    schema_data = json.load(schema_file)
+
+# Extract all field names and data types
+field_info = extract_field_info(schema_data)
+
+# Print the list of field names and data types
+for field_name, field_type in field_info:
+    print(f"Field: {field_name}, Data Type: {field_type}")
