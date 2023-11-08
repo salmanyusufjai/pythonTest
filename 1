@@ -15,7 +15,7 @@ def extract_field_names(schema, prefix=''):
                             field_names += extract_field_names(item, field_name + '.')
                 elif isinstance(field["type"], dict):
                     # Handle nested types as a dictionary
-                    field_names += extract_field_names(item, field_name + '.')
+                    field_names += extract_field_names(field["type"], field_name + '.')
 
     return field_names
 
