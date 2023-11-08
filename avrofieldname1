@@ -1,0 +1,31 @@
+import json
+
+def extract_field_names(schema, prefix=''):
+    field_names = []
+
+    if "fields" in schema:
+        for field in schema["fields"]:
+            field_name = prefix + field["name"]
+            field_names.append(field_name)
+            if "type" in field:
+                if isinstance(field["type"], list):
+                    # Handle nested types as a list
+                    for item in field["type"]:
+                        if isinstance(item, dict):
+                            field_names += extract_field_names(item, field_name + '.')
+                elif isinstance(field["type"], dict):
+                    # Handle nested types as a dictionary
+                    field_names += extract_field_names(field["type"], field_name + '.')
+
+    return field_names
+
+# Open the Avro schema JSON file
+with open('your_schema.json', 'r') as schema_file:
+    schema_data = json.load(schema_file)
+
+# Extract all field names, including nested fields
+field_names = extract_field_names(schema_data)
+
+# Print the list of field names
+for field_name in field_names:
+    print(field_name)
