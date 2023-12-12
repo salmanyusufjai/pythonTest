@@ -32,7 +32,7 @@ def avro_to_bigquery(dataset_id, table_id, avro_file):
         print("No records found in Avro file.")
         return
 
-    avro_schema = reader.schema
+    avro_schema = reader.avro_schema
     create_bigquery_table(dataset_id, table_id, avro_schema)
 
     # Load data into BigQuery table
