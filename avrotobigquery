@@ -1,7 +1,9 @@
-from google.cloud import storage, bigquery
+from io import BytesIO
+from google.cloud import storage
+from google.cloud import bigquery
+from avro.schema import parse
 from avro.datafile import DataFileReader
 from avro.io import DatumReader
-from io import BytesIO
 
 def create_bigquery_table(dataset_id, table_id, avro_schema):
     client = bigquery.Client()
@@ -31,7 +33,7 @@ def avro_to_bigquery(dataset_id, table_id, avro_file):
         print("No records found in Avro file.")
         return
 
-    avro_schema = reader.schema
+    avro_schema = parse(reader.get_meta("avro.schema").decode('utf-8'))
     create_bigquery_table(dataset_id, table_id, avro_schema)
 
     # Load data into BigQuery table
