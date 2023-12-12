@@ -1,3 +1,4 @@
+from io import BytesIO
 from google.cloud import bigquery
 from google.cloud import storage
 from avro.datafile import DataFileReader
