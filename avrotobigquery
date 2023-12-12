@@ -1,0 +1,65 @@
+from google.cloud import bigquery
+from google.cloud import storage
+from avro.datafile import DataFileReader
+from avro.io import DatumReader
+
+def create_bigquery_table(dataset_id, table_id, avro_schema):
+    client = bigquery.Client()
+
+    dataset_ref = client.dataset(dataset_id)
+    dataset = bigquery.Dataset(dataset_ref)
+    
+    if not client.get_dataset(dataset_ref, retry=bigquery.DEFAULT_RETRY).exists():
+        dataset = client.create_dataset(dataset)
+    
+    table_ref = dataset.table(table_id)
+    schema = [bigquery.SchemaField(field['name'], field['type'], mode=field.get('mode', 'NULLABLE')) for field in avro_schema.fields]
+
+    table = bigquery.Table(table_ref, schema=schema)
+    table = client.create_table(table)
+
+    print(f"Table {table_id} created.")
+
+def avro_to_bigquery(dataset_id, table_id, avro_file):
+    client = bigquery.Client()
+
+    with BytesIO(avro_file.download_as_bytes()) as avro_bytes:
+        reader = DataFileReader(avro_bytes, DatumReader())
+        records = [record for record in reader]
+
+    if not records:
+        print("No records found in Avro file.")
+        return
+
+    avro_schema = reader.schema
+    create_bigquery_table(dataset_id, table_id, avro_schema)
+
+    # Load data into BigQuery table
+    table_ref = client.dataset(dataset_id).table(table_id)
+    job_config = bigquery.LoadJobConfig()
+    job_config.source_format = bigquery.SourceFormat.AVRO
+
+    with BytesIO(avro_file.download_as_bytes()) as avro_bytes:
+        job = client.load_table_from_file(avro_bytes, table_ref, job_config=job_config)
+    
+    job.result()  # Waits for the job to complete
+
+    print(f"Data loaded into {dataset_id}.{table_id}.")
+
+def main():
+    # Replace these with your actual values
+    input_bucket = "your-input-bucket"
+    input_folder = "your-input-folder"
+    dataset_id = "your-dataset-id"
+    table_id = "your-table-id"
+
+    storage_client = storage.Client()
+    bucket = storage_client.get_bucket(input_bucket)
+    
+    avro_files = [blob for blob in bucket.list_blobs(prefix=input_folder) if blob.name.endswith('.avro')]
+
+    for avro_file in avro_files:
+        avro_to_bigquery(dataset_id, table_id, avro_file)
+
+if __name__ == "__main__":
+    main()
