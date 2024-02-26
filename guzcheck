@@ -44,3 +44,67 @@ data = json.loads(json_data)
 personnumbers_with_abc = [item["personnumber"] for item in data if any(gaztype["gaztype"] == "abc" for company in item["companies"] for gaztype in company["gaztypes"])]
 
 print("Person numbers with gaztype 'abc':", personnumbers_with_abc)
+
+
+
+===========
+
+
+import json
+
+# Assuming your JSON data is stored in a variable named json_data
+json_data = '''
+[
+    {
+        "personnumber": 111222,
+        "companies": [
+            {
+                "company_number": 1,
+                "gaztypes": [
+                    {"gaztype": "abc", "gazmoment": "moment1", "actiondate": "date1"},
+                    {"gaztype": "xyz", "gazmoment": "moment2", "actiondate": "date2"}
+                ]
+            },
+            {
+                "company_number": 2,
+                "gaztypes": [
+                    {"gaztype": "def", "gazmoment": "moment3", "actiondate": "date3"},
+                    {"gaztype": "ghi", "gazmoment": "moment4", "actiondate": "date4"}
+                ]
+            }
+        ]
+    },
+    {
+        "personnumber": 2346,
+        "companies": [
+            {
+                "company_number": 3,
+                "gaztypes": [
+                    {"gaztype": "jkl", "gazmoment": "moment5", "actiondate": "date5"},
+                    {"gaztype": "abc", "gazmoment": "moment6", "actiondate": "date6"}
+                ]
+            }
+        ]
+    }
+]
+'''
+
+# Load JSON data
+data = json.loads(json_data)
+
+# Define a function to check for gaztype "abc" for a person
+def check_for_gaztype(person_number):
+    for item in data:
+        if item["personnumber"] == person_number:
+            for company in item["companies"]:
+                for gaztype in company["gaztypes"]:
+                    if gaztype["gaztype"] == "abc":
+                        return True
+    return False
+
+# Example usage:
+person_number_to_check = 111222
+if check_for_gaztype(person_number_to_check):
+    print(f"Person {person_number_to_check} has a company with gaztype 'abc'.")
+else:
+    print(f"Person {person_number_to_check} does not have a company with gaztype 'abc'.")
