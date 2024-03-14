@@ -1,0 +1,43 @@
+from google.cloud import bigquery
+import json
+
+# Initialize BigQuery client
+client = bigquery.Client()
+
+# Function to query BigQuery and get data
+def get_data_from_bigquery(table_name, condition):
+    query = f"""
+        SELECT *
+        FROM `{table_name}`
+        WHERE {condition}
+    """
+    query_job = client.query(query)
+    results = query_job.result()
+    data = [dict(row.items()) for row in results]
+    return data
+
+# Function to create JSON file
+def create_json_file(data):
+    with open('output.json', 'w') as f:
+        json.dump(data, f)
+
+# Main function
+def main():
+    # Get PView data from BigQuery
+    pview_data = get_data_from_bigquery('pview_table', 'entitykey = <your_entity_key>')
+    
+    # Get AOutput data from BigQuery
+    aoutput_data = get_data_from_bigquery('aoutput_table', 'entitykey = <your_entity_key>')
+    
+    # Create JSON object
+    json_data = {
+        'cmp': '',
+        'Pview': pview_data,
+        'AOutput': aoutput_data
+    }
+    
+    # Create JSON file
+    create_json_file(json_data)
+
+if __name__ == "__main__":
+    main()
