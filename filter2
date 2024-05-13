@@ -1,0 +1,28 @@
+data = [
+    {"prfix":"123","appointmentType":"01","appointmentDate":"20230103","resignDate":"20241203","updatedDate":"20241201"},
+    {"prfix":"123","appointmentType":"01","appointmentDate":"20230103","resignDate":"20241203","updatedDate":"20241101"},
+    {"prfix":"123","appointmentType":"02","appointmentDate":"20230103","resignDate":"20241203","updatedDate":"20241201"},
+    {"prfix":"124","appointmentType":"01","appointmentDate":"20231203","resignDate":"20241203","updatedDate":"20241201"}
+]
+
+# Group records by 'prfix'
+grouped_data = {}
+for record in data:
+    prefix = record['prfix']
+    if prefix not in grouped_data:
+        grouped_data[prefix] = []
+    grouped_data[prefix].append(record)
+
+# Select the unique records based on the criteria
+unique_records = []
+for prefix, records in grouped_data.items():
+    unique_fields = set((r['appointmentType'], r['appointmentDate'], r['resignDate']) for r in records)
+    for field_combination in unique_fields:
+        duplicates = [r for r in records if (r['appointmentType'], r['appointmentDate'], r['resignDate']) == field_combination]
+        if len(duplicates) > 1:
+            latest_record = max(duplicates, key=lambda x: x['updatedDate'])
+            unique_records.append(latest_record)
+        else:
+            unique_records.extend(duplicates)
+
+print(len(unique_records))
