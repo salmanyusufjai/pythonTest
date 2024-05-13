@@ -1,0 +1,37 @@
+data = [
+    {"prfix":"123","appointmentType":"01","appointmentDate":"20230103","resignDate":"20241203","updatedDate":"20241201"},
+    {"prfix":"123","appointmentType":"01","appointmentDate":"20230103","resignDate":"20241203","updatedDate":"20241101"},
+    {"prfix":"123","appointmentType":"02","appointmentDate":"20230103","resignDate":"20241203","updatedDate":None},
+    {"prfix":"124","appointmentType":"01","appointmentDate":"20231203","resignDate":"20241203","updatedDate":None}
+]
+
+# Group records by 'prfix'
+grouped_data = {}
+for record in data:
+    prefix = record['prfix']
+    if prefix not in grouped_data:
+        grouped_data[prefix] = []
+    grouped_data[prefix].append(record)
+
+# Select the unique records based on the criteria
+unique_records = []
+for prefix, records in grouped_data.items():
+    unique_fields = set((r['appointmentType'], r['appointmentDate'], r['resignDate']) for r in records)
+    for field_combination in unique_fields:
+        duplicates = [r for r in records if (r['appointmentType'], r['appointmentDate'], r['resignDate']) == field_combination]
+        if len(duplicates) > 1:
+            # Check if all "updatedDate" values are None
+            if all(record['updatedDate'] is None for record in duplicates):
+                latest_record = duplicates[0]  # Take the first record
+            else:
+                # Filter out records where "updatedDate" is None
+                duplicates_with_updated_date = [r for r in duplicates if r['updatedDate'] is not None]
+                if duplicates_with_updated_date:
+                    latest_record = max(duplicates_with_updated_date, key=lambda x: x['updatedDate'])
+                else:
+                    latest_record = max(duplicates, key=lambda x: x['updatedDate'] if x['updatedDate'] is not None else float('-inf'))
+            unique_records.append(latest_record)
+        else:
+            unique_records.extend(duplicates)
+
+print(len(unique_records))
