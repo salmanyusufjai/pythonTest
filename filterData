@@ -1,0 +1,33 @@
+data = [
+    {"prfix":"123","appointmentType":"01","appointmentDate":"20231203","resignDate":"","updatedDate":"20241201"},
+    {"prfix":"123","appointmentType":"02","appointmentDate":"20230103","resignDate":"20241203","updatedDate":"20241201"},
+    {"prfix":"123","appointmentType":"01","appointmentDate":"20230103","resignDate":"20241203","updatedDate":"20241101"},
+    {"prfix":"124","appointmentType":"01","appointmentDate":"20231203","resignDate":"20241203","updatedDate":"20241201"}
+]
+
+# Group records by 'prfix'
+grouped_data = {}
+for record in data:
+    prefix = record['prfix']
+    if prefix not in grouped_data:
+        grouped_data[prefix] = {}
+    appointment_type = record['appointmentType']
+    if appointment_type not in grouped_data[prefix]:
+        grouped_data[prefix][appointment_type] = []
+    grouped_data[prefix][appointment_type].append(record)
+
+# Select the unique record based on the criteria
+unique_records = []
+for prefix, appointment_types in grouped_data.items():
+    for appointment_type, records in appointment_types.items():
+        if len(records) == 1:
+            unique_records.extend(records)
+        else:
+            unique_resign_dates = set(r['resignDate'] for r in records)
+            if len(unique_resign_dates) == len(records):
+                unique_records.extend(records)
+            else:
+                records.sort(key=lambda x: x['updatedDate'], reverse=True)
+                unique_records.append(records[0])
+
+print(unique_records)
