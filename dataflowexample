@@ -1,0 +1,52 @@
+import apache_beam as beam
+from apache_beam.options.pipeline_options import PipelineOptions, GoogleCloudOptions, StandardOptions
+from apache_beam.io.gcp.bigquery import ReadFromBigQuery, WriteToBigQuery
+
+# Set up your Google Cloud project, bucket, and region
+project_id = 'your-project-id'
+temp_location = 'gs://your-temp-bucket/temp'
+region = 'your-region'
+
+# Define the pipeline options
+options = PipelineOptions()
+google_cloud_options = options.view_as(GoogleCloudOptions)
+google_cloud_options.project = project_id
+google_cloud_options.job_name = 'simple-dataflow-job'
+google_cloud_options.temp_location = temp_location
+google_cloud_options.region = region
+
+# Set the pipeline to run on Dataflow
+options.view_as(StandardOptions).runner = 'DataflowRunner'
+
+# Define the input and output BigQuery tables
+input_table = f'{project_id}:your_dataset.your_input_table'
+output_table = f'{project_id}:your_dataset.your_output_table'
+
+# Define the schema for the output table
+output_schema = {
+    'fields': [
+        {'name': 'entitykey', 'type': 'STRING', 'mode': 'NULLABLE'},
+        {'name': 'crn', 'type': 'STRING', 'mode': 'NULLABLE'},
+        {'name': 'new_field', 'type': 'STRING', 'mode': 'NULLABLE'}
+    ]
+}
+
+# Define the transformation function
+class AddNewFieldFn(beam.DoFn):
+    def process(self, element):
+        element['new_field'] = 'new_value'
+        yield element
+
+# Create the pipeline
+with beam.Pipeline(options=options) as p:
+    (
+        p
+        | 'ReadFromBigQuery' >> ReadFromBigQuery(table=input_table)
+        | 'AddNewField' >> beam.ParDo(AddNewFieldFn())
+        | 'WriteToBigQuery' >> WriteToBigQuery(
+            table=output_table,
+            schema=output_schema,
+            write_disposition=beam.io.BigQueryDisposition.WRITE_TRUNCATE,
+            create_disposition=beam.io.BigQueryDisposition.CREATE_IF_NEEDED
+        )
+    )
