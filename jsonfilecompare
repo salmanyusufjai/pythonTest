@@ -1,0 +1,36 @@
+import json
+
+def read_json_entries(file_path):
+    with open(file_path, mode='r') as file:
+        data = json.load(file)
+        # Convert each JSON object to a string for comparison
+        entries = [json.dumps(entry, sort_keys=True) for entry in data]
+    return entries
+
+def compare_json_files(file1_path, file2_path):
+    # Read entries from both files
+    entries_file1 = set(read_json_entries(file1_path))
+    entries_file2 = set(read_json_entries(file2_path))
+
+    # Find common entries using set intersection
+    common_entries = entries_file1.intersection(entries_file2)
+    return common_entries
+
+def main():
+    # File paths for the JSON files to compare
+    file1_path = 'file1.json'
+    file2_path = 'file2.json'
+
+    # Get the common entries between the two files
+    common_entries = compare_json_files(file1_path, file2_path)
+
+    # Output the common entries
+    if common_entries:
+        print("Common entries between the two JSON files:")
+        for entry in common_entries:
+            print(json.loads(entry))  # Convert back to JSON object for pretty printing
+    else:
+        print("No common entries found between the two JSON files.")
+
+if __name__ == "__main__":
+    main()
