@@ -1,0 +1,41 @@
+import csv
+
+def read_csv_lines(file_path):
+    with open(file_path, mode='r', newline='') as file:
+        reader = csv.reader(file)
+        # Join each row into a single string to represent each line
+        lines = [','.join(row) for row in reader]
+    return lines
+
+def find_non_common_lines(file1_path, file2_path):
+    # Read lines from both files
+    lines_file1 = set(read_csv_lines(file1_path))
+    lines_file2 = set(read_csv_lines(file2_path))
+
+    # Find lines that are unique to each file using set difference
+    unique_to_file1 = lines_file1.difference(lines_file2)
+    unique_to_file2 = lines_file2.difference(lines_file1)
+
+    return unique_to_file1, unique_to_file2
+
+def main():
+    # File paths for the CSV files to compare
+    file1_path = 'file1.csv'
+    file2_path = 'file2.csv'
+
+    # Get the non-common lines between the two files
+    unique_to_file1, unique_to_file2 = find_non_common_lines(file1_path, file2_path)
+
+    # Output the unique lines
+    if unique_to_file1 or unique_to_file2:
+        print("Lines unique to file1.csv:")
+        for line in unique_to_file1:
+            print(line)
+        print("\nLines unique to file2.csv:")
+        for line in unique_to_file2:
+            print(line)
+    else:
+        print("No unique lines found; all lines are common between the two CSV files.")
+
+if __name__ == "__main__":
+    main()
