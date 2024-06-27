@@ -1,0 +1,30 @@
+import csv
+
+def read_csv_lines(file_path):
+    with open(file_path, mode='r', newline='') as file:
+        reader = csv.reader(file)
+        lines = [','.join(row) for row in reader]
+    return lines
+
+def compare_csv_files(file1_path, file2_path):
+    lines_file1 = set(read_csv_lines(file1_path))
+    lines_file2 = set(read_csv_lines(file2_path))
+
+    common_lines = lines_file1.intersection(lines_file2)
+    return common_lines
+
+def main():
+    file1_path = 'file1.csv'
+    file2_path = 'file2.csv'
+
+    common_lines = compare_csv_files(file1_path, file2_path)
+
+    if common_lines:
+        print("Common lines between the two CSV files:")
+        for line in common_lines:
+            print(line)
+    else:
+        print("No common lines found between the two CSV files.")
+
+if __name__ == "__main__":
+    main()
