@@ -1,37 +1,25 @@
-import hashlib
-
-def file_to_blocks(filename, block_size=40):
-    """
-    Read a file and return its content in fixed-size blocks.
-    """
-    blocks = []
-    with open(filename, "r", encoding="utf-8") as file:
-        lines = file.readlines()
-        for i in range(0, len(lines), block_size):
-            block = "".join(lines[i:i+block_size])
-            blocks.append(block)
-    return blocks
-
-def find_duplicates_in_file(filename):
+def find_duplicates_in_file(file_path):
     """
     Find duplicate code blocks within a single Python file.
     """
-    blocks = file_to_blocks(filename)
-    hashed_blocks = {}
     duplicates = []
+    lines_seen = {}
+    line_number = 0
 
-    for i, block in enumerate(blocks):
-        block_hash = hashlib.sha256(block.encode("utf-8")).hexdigest()
-        if block_hash in hashed_blocks:
-            duplicates.append((hashed_blocks[block_hash], i + 1))
-        else:
-            hashed_blocks[block_hash] = i + 1
-
+    with open(file_path, 'r', encoding='utf-8') as file:
+        for line in file:
+            line_number += 1
+            if line.strip():  # Ignore empty lines
+                if line not in lines_seen:
+                    lines_seen[line] = line_number
+                else:
+                    duplicates.append((lines_seen[line], line_number))
+    
     return duplicates
 
 # Example usage:
-file_to_check = "path/to/your/code.py"
-duplicates = find_duplicates_in_file(file_to_check)
+file_path = 'path/to/your/code.py'
+duplicates = find_duplicates_in_file(file_path)
 
 if duplicates:
     print("Duplicate code found:")
