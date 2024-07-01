@@ -1,9 +1,14 @@
 from google.cloud import bigquery
-from google.cloud.exceptions import NotFound
-from datetime import datetime
+from google.auth import load_credentials_from_file
 
-# Initialize BigQuery client
-client = bigquery.Client()
+# Path to your user authentication JSON file
+user_auth_file = 'path/to/your/user_authentication.json'
+
+# Load credentials from the user authentication JSON file
+credentials, project_id = load_credentials_from_file(user_auth_file)
+
+# Initialize BigQuery client with user credentials
+client = bigquery.Client(credentials=credentials, project=project_id)
 
 # Function to convert dd/mm/yyyy format to timestamp
 def convert_to_timestamp(date_string):
@@ -15,7 +20,7 @@ def fetch_data_with_parameters(project, dataset, query, params):
         job_config = bigquery.QueryJobConfig(query_parameters=params)
         query_job = client.query(query, job_config=job_config, project=project, dataset=dataset)
         return query_job.result().to_dataframe()
-    except NotFound:
+    except bigquery.NotFound:
         print(f"Table not found error: {query}")
     except Exception as e:
         print(f"Error fetching data: {str(e)}")
@@ -28,7 +33,7 @@ def query_main_table(project, dataset):
         FROM `{project}.{dataset}.main_table`
         """
         return client.query(query).result().to_dataframe()
-    except NotFound:
+    except bigquery.NotFound:
         print("Main table not found error")
     except Exception as e:
         print(f"Error querying main table: {str(e)}")
@@ -74,9 +79,9 @@ def fetch_and_merge_data(project, dataset, main_table, table_name, key_field, ad
 if __name__ == "__main__":
     try:
         # Example dynamic project and dataset names
-        main_project = 'your_main_project'
+        main_project = 'your_main_project_id'
         main_dataset = 'your_main_dataset'
-        holgroup_project = 'your_holgroup_project'
+        holgroup_project = 'your_holgroup_project_id'
         holgroup_dataset = 'your_holgroup_dataset'
 
         # Query main table
