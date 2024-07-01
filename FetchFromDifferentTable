@@ -15,34 +15,50 @@ main_query = f"""
 main_df = client.query(main_query).to_dataframe()
 
 # Function to fetch the latest partitioned data with specific fields
-def fetch_latest_partitioned_data(main_df, table_name, join_field, fields, rundate_field='rundate'):
+def fetch_latest_partitioned_data(main_df, table_name, join_field, fields, key_values, key_field, rundate_field='rundate'):
     fields_str = ', '.join(fields)
+    key_values_str = ', '.join(f"'{val}'" for val in key_values)
+    
     query = f"""
-        WITH latest_data AS (
-            SELECT {fields_str},
-            ROW_NUMBER() OVER (PARTITION BY {join_field} ORDER BY {rundate_field} DESC) AS row_num
+        WITH main_data AS (
+            SELECT 
+                entitykey,
+                crn,
+                PARSE_DATE('%d/%m/%Y', rundate) AS rundate_date
+            FROM `{project}.{dataset}.main_table`
+        ),
+        filtered_data AS (
+            SELECT 
+                {fields_str},
+                ROW_NUMBER() OVER (PARTITION BY {join_field} ORDER BY _PARTITIONTIME DESC) AS row_num
             FROM `{project}.{dataset}.{table_name}`
-            WHERE {rundate_field} <= (SELECT MAX(rundate) FROM main_df)
+            WHERE 
+                _PARTITIONTIME <= (SELECT MAX(rundate_date) FROM main_data) 
+                AND {key_field} IN ({key_values_str})
         )
-        SELECT * EXCEPT(row_num) FROM latest_data WHERE row_num = 1
+        SELECT * EXCEPT(row_num) FROM filtered_data WHERE row_num = 1
     """
     return client.query(query).to_dataframe()
 
+# Fetch relevant keys from the main dataframe
+entitykeys = main_df['entitykey'].unique().tolist()
+crns = main_df['crn'].unique().tolist()
+
 # Fetch latest data from holgroup table with specific fields
-holgroup_fields = ['crn', 'UHCCRN', 'IHCCRN', 'rundate']  # Specify fields you need
-holgroup_df = fetch_latest_partitioned_data(main_df, 'holgroup', 'crn', holgroup_fields)
+holgroup_fields = ['crn', 'UHCCRN', 'IHCCRN', '_PARTITIONTIME']  # Specify fields you need
+holgroup_df = fetch_latest_partitioned_data(main_df, 'holgroup', 'crn', holgroup_fields, crns, 'crn')
 
 # Merge main table data with holgroup data
 merged_df = main_df.merge(holgroup_df, on='crn', how='left')
 
 # Fetch latest data from other tables using entitykey with specific fields
-score_fields = ['entitykey', 'score', 'grade', 'rundate']  # Specify fields you need from b1
-limit_fields = ['entitykey', 'limit', 'rundate']  # Specify fields you need from b2
-pscore_fields = ['entitykey', 'pscore', 'rundate']  # Specify fields you need from b3
+score_fields = ['entitykey', 'score', 'grade', '_PARTITIONTIME']  # Specify fields you need from b1
+limit_fields = ['entitykey', 'limit', '_PARTITIONTIME']  # Specify fields you need from b2
+pscore_fields = ['entitykey', 'pscore', '_PARTITIONTIME']  # Specify fields you need from b3
 
-score_df = fetch_latest_partitioned_data(main_df, 'b1', 'entitykey', score_fields)
-limit_df = fetch_latest_partitioned_data(main_df, 'b2', 'entitykey', limit_fields)
-pscore_df = fetch_latest_partitioned_data(main_df, 'b3', 'entitykey', pscore_fields)
+score_df = fetch_latest_partitioned_data(main_df, 'b1', 'entitykey', score_fields, entitykeys, 'entitykey')
+limit_df = fetch_latest_partitioned_data(main_df, 'b2', 'entitykey', limit_fields, entitykeys, 'entitykey')
+pscore_df = fetch_latest_partitioned_data(main_df, 'b3', 'entitykey', pscore_fields, entitykeys, 'entitykey')
 
 # Merge all data
 enhanced_df = merged_df.merge(score_df, on='entitykey', how='left') \
@@ -50,11 +66,14 @@ enhanced_df = merged_df.merge(score_df, on='entitykey', how='left') \
                        .merge(pscore_df, on='entitykey', how='left')
 
 # Fetch additional data using UHCCRN and IHCCRN from holgroup data with specific fields
-uhccrn_fields = ['UHCCRN', 'score', 'grade', 'rundate']  # Specify fields you need from b1 for UHCCRN
-ihccrn_fields = ['IHCCRN', 'score', 'grade', 'rundate']  # Specify fields you need from b1 for IHCCRN
+uhccrn_keys = holgroup_df['UHCCRN'].dropna().unique().tolist()
+ihccrn_keys = holgroup_df['IHCCRN'].dropna().unique().tolist()
 
-uhccrn_df = fetch_latest_partitioned_data(holgroup_df, 'b1', 'UHCCRN', uhccrn_fields)
-ihccrn_df = fetch_latest_partitioned_data(holgroup_df, 'b1', 'IHCCRN', ihccrn_fields)
+uhccrn_fields = ['UHCCRN', 'score', 'grade', '_PARTITIONTIME']  # Specify fields you need from b1 for UHCCRN
+ihccrn_fields = ['IHCCRN', 'score', 'grade', '_PARTITIONTIME']  # Specify fields you need from b1 for IHCCRN
+
+uhccrn_df = fetch_latest_partitioned_data(holgroup_df, 'b1', 'UHCCRN', uhccrn_fields, uhccrn_keys, 'UHCCRN')
+ihccrn_df = fetch_latest_partitioned_data(holgroup_df, 'b1', 'IHCCRN', ihccrn_fields, ihccrn_keys, 'IHCCRN')
 
 # Merge with the enhanced data
 final_df = enhanced_df.merge(uhccrn_df, on='UHCCRN', how='left') \
