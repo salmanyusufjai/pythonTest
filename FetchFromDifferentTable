@@ -1,0 +1,64 @@
+from google.cloud import bigquery
+
+# Initialize BigQuery client
+client = bigquery.Client()
+
+# Define your project and dataset
+project = 'your_project'
+dataset = 'your_dataset'
+
+# Query to fetch data from the main table
+main_query = f"""
+    SELECT entitykey, crn, rundate, -- Add other fields as necessary
+    FROM `{project}.{dataset}.main_table`
+"""
+main_df = client.query(main_query).to_dataframe()
+
+# Function to fetch the latest partitioned data with specific fields
+def fetch_latest_partitioned_data(main_df, table_name, join_field, fields, rundate_field='rundate'):
+    fields_str = ', '.join(fields)
+    query = f"""
+        WITH latest_data AS (
+            SELECT {fields_str},
+            ROW_NUMBER() OVER (PARTITION BY {join_field} ORDER BY {rundate_field} DESC) AS row_num
+            FROM `{project}.{dataset}.{table_name}`
+            WHERE {rundate_field} <= (SELECT MAX(rundate) FROM main_df)
+        )
+        SELECT * EXCEPT(row_num) FROM latest_data WHERE row_num = 1
+    """
+    return client.query(query).to_dataframe()
+
+# Fetch latest data from holgroup table with specific fields
+holgroup_fields = ['crn', 'UHCCRN', 'IHCCRN', 'rundate']  # Specify fields you need
+holgroup_df = fetch_latest_partitioned_data(main_df, 'holgroup', 'crn', holgroup_fields)
+
+# Merge main table data with holgroup data
+merged_df = main_df.merge(holgroup_df, on='crn', how='left')
+
+# Fetch latest data from other tables using entitykey with specific fields
+score_fields = ['entitykey', 'score', 'grade', 'rundate']  # Specify fields you need from b1
+limit_fields = ['entitykey', 'limit', 'rundate']  # Specify fields you need from b2
+pscore_fields = ['entitykey', 'pscore', 'rundate']  # Specify fields you need from b3
+
+score_df = fetch_latest_partitioned_data(main_df, 'b1', 'entitykey', score_fields)
+limit_df = fetch_latest_partitioned_data(main_df, 'b2', 'entitykey', limit_fields)
+pscore_df = fetch_latest_partitioned_data(main_df, 'b3', 'entitykey', pscore_fields)
+
+# Merge all data
+enhanced_df = merged_df.merge(score_df, on='entitykey', how='left') \
+                       .merge(limit_df, on='entitykey', how='left') \
+                       .merge(pscore_df, on='entitykey', how='left')
+
+# Fetch additional data using UHCCRN and IHCCRN from holgroup data with specific fields
+uhccrn_fields = ['UHCCRN', 'score', 'grade', 'rundate']  # Specify fields you need from b1 for UHCCRN
+ihccrn_fields = ['IHCCRN', 'score', 'grade', 'rundate']  # Specify fields you need from b1 for IHCCRN
+
+uhccrn_df = fetch_latest_partitioned_data(holgroup_df, 'b1', 'UHCCRN', uhccrn_fields)
+ihccrn_df = fetch_latest_partitioned_data(holgroup_df, 'b1', 'IHCCRN', ihccrn_fields)
+
+# Merge with the enhanced data
+final_df = enhanced_df.merge(uhccrn_df, on='UHCCRN', how='left') \
+                      .merge(ihccrn_df, on='IHCCRN', how='left')
+
+# Display the final enhanced result
+print(final_df)
