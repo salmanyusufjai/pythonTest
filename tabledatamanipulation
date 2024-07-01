@@ -1,0 +1,111 @@
+from google.cloud import bigquery
+from google.cloud.exceptions import NotFound
+from datetime import datetime
+
+# Initialize BigQuery client
+client = bigquery.Client()
+
+# Function to convert dd/mm/yyyy format to timestamp
+def convert_to_timestamp(date_string):
+    return datetime.strptime(date_string, '%d/%m/%Y').strftime('%Y-%m-%d')
+
+# Function to fetch data using parameterized queries
+def fetch_data_with_parameters(query, params):
+    try:
+        job_config = bigquery.QueryJobConfig(query_parameters=params)
+        query_job = client.query(query, job_config=job_config)
+        return query_job.result().to_dataframe()
+    except NotFound:
+        print(f"Table not found error: {query}")
+    except Exception as e:
+        print(f"Error fetching data: {str(e)}")
+
+# Query the main table
+def query_main_table():
+    try:
+        query = """
+        SELECT entity_key, company_number, processingdate, other_fields
+        FROM `project.dataset.main_table`
+        """
+        return client.query(query).result().to_dataframe()
+    except NotFound:
+        print("Main table not found error")
+    except Exception as e:
+        print(f"Error querying main table: {str(e)}")
+
+# Fetch holdingco and holdtype from the holgroup table
+def fetch_holgroup_data(main_table):
+    try:
+        query = """
+        SELECT company_number, holdingco, holdtype
+        FROM `project.dataset.holgroup`
+        WHERE company_number IN UNNEST(@company_numbers)
+        AND _partitiontime <= TIMESTAMP(@processing_date)
+        ORDER BY _partitiontime DESC
+        """
+        params = [
+            bigquery.ArrayParameter("company_numbers", "STRING", main_table['company_number'].tolist()),
+            bigquery.ScalarParameter("processing_date", "TIMESTAMP", main_table['processingdate'].max()),
+        ]
+        return fetch_data_with_parameters(query, params)
+    except Exception as e:
+        print(f"Error fetching holgroup data: {str(e)}")
+
+# Function to fetch and merge additional data from other tables
+def fetch_and_merge_data(main_table, table_name, key_field, additional_fields):
+    try:
+        query_template = """
+        SELECT {key_field}, {additional_fields}
+        FROM `project.dataset.{table_name}`
+        WHERE {key_field} IN UNNEST(@keys)
+        AND _partitiontime <= TIMESTAMP(@processing_date)
+        ORDER BY _partitiontime DESC
+        """
+        params = [
+            bigquery.ArrayParameter("keys", "STRING", main_table[key_field].dropna().tolist()),
+            bigquery.ScalarParameter("processing_date", "TIMESTAMP", main_table['processingdate'].max()),
+        ]
+        query = query_template.format(table_name=table_name, key_field=key_field, additional_fields=', '.join(additional_fields))
+        return fetch_data_with_parameters(query, params)
+    except Exception as e:
+        print(f"Error fetching and merging {table_name} data: {str(e)}")
+
+# Main execution flow
+if __name__ == "__main__":
+    try:
+        # Query main table
+        main_table = query_main_table()
+
+        # Convert processingdate to timestamp
+        main_table['processingdate'] = main_table['processingdate'].apply(convert_to_timestamp)
+
+        # Fetch and merge holgroup data
+        holgroup_data = fetch_holgroup_data(main_table)
+        if holgroup_data is not None:
+            main_table = main_table.merge(holgroup_data, on='company_number', how='left')
+
+        # Fetch and merge additional data from scorecheck, acl, protectscore
+        tables_to_fetch = [('scorecheck', 'company_number', ['score', 'grade']),
+                           ('acl', 'company_number', ['finallimit']),
+                           ('protectscore', 'company_number', ['pscore'])]
+
+        for table_name, key_field, additional_fields in tables_to_fetch:
+            data = fetch_and_merge_data(main_table, table_name, key_field, additional_fields)
+            if data is not None:
+                main_table = main_table.merge(data, on=key_field, how='left')
+
+        # Fetch and merge UHC data from scorecheck, acl, protectscore
+        uhc_tables_to_fetch = [('scorecheck', 'holdingco', ['score as uhc_score', 'grade as uhc_grade']),
+                               ('acl', 'holdingco', ['finallimit as uhc_limit']),
+                               ('protectscore', 'holdingco', ['pscore as uhc_protectscore'])]
+
+        for table_name, key_field, additional_fields in uhc_tables_to_fetch:
+            uhc_data = fetch_and_merge_data(main_table, table_name, key_field, additional_fields)
+            if uhc_data is not None:
+                main_table = main_table.merge(uhc_data, on=key_field, how='left')
+
+        # Print or further process main_table with all merged data
+        print(main_table.head())
+
+    except Exception as e:
+        print(f"Error in main execution flow: {str(e)}")
