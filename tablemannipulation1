@@ -1,0 +1,77 @@
+from google.cloud import bigquery
+from google.auth import load_credentials_from_file
+from datetime import datetime
+
+# Load credentials from the user authentication JSON file
+credentials, project_id = load_credentials_from_file("/path/to/your/user_authentication.json")
+
+# Initialize BigQuery client with user credentials
+client = bigquery.Client(credentials=credentials, project=project_id)
+
+# Function to convert dd/mm/yyyy format to timestamp
+def convert_to_timestamp(date_string):
+    return datetime.strptime(date_string, '%d/%m/%Y').strftime('%Y-%m-%d')
+
+# Function to fetch data using parameterized queries
+def fetch_data_with_parameters(query, params):
+    try:
+        job_config = bigquery.QueryJobConfig(query_parameters=params)
+        query_job = client.query(query, job_config=job_config)
+        return query_job.result().to_dataframe()
+    except Exception as e:
+        print(f"Error fetching data: {str(e)}")
+
+# Example function to fetch data from main_table with parameters
+def query_main_table(project, dataset):
+    try:
+        query = f"""
+        SELECT entity_key, company_number, processingdate, other_fields
+        FROM `{project}.{dataset}.main_table`
+        """
+        return fetch_data_with_parameters(query, [])
+    except Exception as e:
+        print(f"Error querying main table: {str(e)}")
+
+# Example function to fetch data from holgroup with parameters
+def fetch_holgroup_data(project, dataset, main_table):
+    try:
+        params = [
+            bigquery.ScalarQueryParameter("company_numbers", "STRING", main_table['company_number'].tolist()),
+            bigquery.ScalarQueryParameter("processing_date", "TIMESTAMP", main_table['processingdate'].max()),
+        ]
+        query = f"""
+        SELECT company_number, holdingco, holdtype
+        FROM `{project}.{dataset}.holgroup`
+        WHERE company_number IN UNNEST(@company_numbers)
+        AND _partitiontime <= TIMESTAMP(@processing_date)
+        ORDER BY _partitiontime DESC
+        """
+        return fetch_data_with_parameters(query, params)
+    except Exception as e:
+        print(f"Error fetching holgroup data: {str(e)}")
+
+# Main execution flow
+if __name__ == "__main__":
+    try:
+        # Example dynamic project and dataset names
+        main_project = 'your_main_project_id'
+        main_dataset = 'your_main_dataset'
+        holgroup_project = 'your_holgroup_project_id'
+        holgroup_dataset = 'your_holgroup_dataset'
+
+        # Query main table
+        main_table = query_main_table(main_project, main_dataset)
+
+        # Convert processingdate to timestamp
+        main_table['processingdate'] = main_table['processingdate'].apply(convert_to_timestamp)
+
+        # Fetch and merge holgroup data
+        holgroup_data = fetch_holgroup_data(holgroup_project, holgroup_dataset, main_table)
+        if holgroup_data is not None:
+            main_table = main_table.merge(holgroup_data, on='company_number', how='left')
+
+        # Print or further process main_table with all merged data
+        print(main_table.head())
+
+    except Exception as e:
+        print(f"Error in main execution flow: {str(e)}")
