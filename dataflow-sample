@@ -1,0 +1,63 @@
+pip install apache-beam[gcp]
+
+apple
+banana
+apple
+orange
+banana
+banana
+grape
+
+
+import apache_beam as beam
+from apache_beam.options.pipeline_options import PipelineOptions
+
+# Define a function to format the output
+def format_result(word, count):
+    return f"{word}: {count}"
+
+# Create a custom pipeline options class
+class WordCountOptions(PipelineOptions):
+    @classmethod
+    def _add_argparse_args(cls, parser):
+        parser.add_value_provider_argument(
+            '--input',
+            type=str,
+            default='input.txt',
+            help='Path to the input file')
+        parser.add_value_provider_argument(
+            '--output',
+            type=str,
+            default='output',
+            help='Path to the output file prefix')
+
+def run(argv=None):
+    # Parse the pipeline options
+    pipeline_options = PipelineOptions(argv)
+    wordcount_options = pipeline_options.view_as(WordCountOptions)
+    
+    # Create the Beam pipeline
+    with beam.Pipeline(options=pipeline_options) as pipeline:
+        # Read the input text file
+        lines = (
+            pipeline
+            | 'ReadInputFile' >> beam.io.ReadFromText(wordcount_options.input)
+        )
+        
+        # Count the occurrences of each word
+        word_counts = (
+            lines
+            | 'CountWords' >> beam.combiners.Count.PerElement()
+        )
+        
+        # Format the results
+        formatted_results = (
+            word_counts
+            | 'FormatResults' >> beam.MapTuple(format_result)
+        )
+        
+        # Write the results to an output text file
+        formatted_results | 'WriteOutputFile' >> beam.io.WriteToText(wordcount_options.output)
+
+if __name__ == '__main__':
+    run()
