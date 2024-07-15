@@ -1,0 +1,43 @@
+pip install google-cloud-bigquery
+gcloud auth application-default login
+
+
+from google.cloud import bigquery
+
+def export_query_to_avro(project_id, query, bucket_name, destination_blob_name):
+    client = bigquery.Client(project=project_id)
+    
+    # Configure the query job
+    job_config = bigquery.QueryJobConfig()
+    destination_uri = f"gs://{bucket_name}/{destination_blob_name}"
+    
+    # Run the query and store the results in a temporary table
+    query_job = client.query(query, job_config=job_config)
+    query_job.result()  # Wait for the query to complete
+
+    # Extract the query results to an Avro file in GCS
+    extract_job = client.extract_table(
+        query_job.destination,
+        destination_uri,
+        location="US",  # Change this to your location if needed
+        job_config=bigquery.job.ExtractJobConfig(destination_format=bigquery.DestinationFormat.AVRO),
+    )
+
+    extract_job.result()  # Wait for the extract job to complete
+
+    print(f"Exported query results to {destination_uri}")
+
+def main():
+    project_id = 'your-project-id'
+    query = '''
+    SELECT *
+    FROM `your_dataset.your_table`
+    WHERE your_condition
+    '''
+    bucket_name = 'your-gcs-bucket'
+    destination_blob_name = 'output.avro'
+
+    export_query_to_avro(project_id, query, bucket_name, destination_blob_name)
+
+if __name__ == '__main__':
+    main()
