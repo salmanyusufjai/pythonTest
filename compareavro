@@ -1,44 +1,28 @@
-import fastavro
 import json
 
-def read_avro_file(file_path):
-    with open(file_path, 'rb') as f:
-        reader = fastavro.reader(f)
-        schema = reader.schema
-        records = [record for record in reader]
-    return schema, records
+def read_schema(file_path):
+    with open(file_path, 'r') as f:
+        schema = json.load(f)
+    return schema
 
 def compare_schemas(schema1, schema2):
     return schema1 == schema2
 
-def compare_records(records1, records2):
-    return records1 == records2
-
 def main():
-    file1 = 'path/to/first-avro-file.avro'
-    file2 = 'path/to/second-avro-file.avro'
+    file1 = 'path/to/first-schema-file.avsc'
+    file2 = 'path/to/second-schema-file.avsc'
 
-    schema1, records1 = read_avro_file(file1)
-    schema2, records2 = read_avro_file(file2)
+    schema1 = read_schema(file1)
+    schema2 = read_schema(file2)
 
     schemas_equal = compare_schemas(schema1, schema2)
-    records_equal = compare_records(records1, records2)
 
     print(f"Schemas are {'equal' if schemas_equal else 'different'}")
-    print(f"Records are {'equal' if records_equal else 'different'}")
 
     # For more detailed differences
     if not schemas_equal:
         print("Differences in schemas:")
+        print("Schema 1:")
         print(json.dumps(schema1, indent=2))
+        print("Schema 2:")
         print(json.dumps(schema2, indent=2))
-
-    if not records_equal:
-        print("Differences in records:")
-        for record1, record2 in zip(records1, records2):
-            if record1 != record2:
-                print("Record in first file:")
-                print(json.dumps(record1, indent=2))
-                print("Record in second file:")
-                print(json.dumps(record2, indent=2))
-                print("-" * 40)
