@@ -1,0 +1,53 @@
+from google.cloud import bigquery
+
+def fetch_and_decrypt_data(dataset_id, table_id, fields_to_decrypt):
+    # Initialize a BigQuery client
+    client = bigquery.Client()
+
+    # Helper function to handle nested fields within arrays
+    def decrypt_nested_fields(field):
+        parts = field.split('.')
+        if len(parts) > 2:
+            nested_array = parts[-2]
+            nested_field = parts[-1]
+            parent_path = ".".join(parts[:-2])
+            return f"""
+                ARRAY(
+                    SELECT AS STRUCT {nested_array}.*, 
+                    decrypt_function({nested_array}.{nested_field}) AS {nested_field}
+                    FROM UNNEST({parent_path}.{nested_array}) AS {nested_array}
+                ) AS {nested_array}
+            """
+        else:
+            return f"decrypt_function({field}) AS {field}"
+
+    # Construct the SQL query
+    select_clause = [decrypt_nested_fields(field) for field in fields_to_decrypt]
+    select_clause_str = ", ".join(select_clause)
+    
+    query = f"""
+    SELECT {select_clause_str}, *
+    FROM `{dataset_id}.{table_id}`
+    """
+
+    # Execute the query
+    query_job = client.query(query)
+
+    # Fetch the results
+    results = query_job.result()
+
+    # Convert results to list of dictionaries
+    rows = [dict(row) for row in results]
+
+    return rows
+
+# Example usage:
+dataset_id = "your_dataset_id"
+table_id = "your_table_id"
+fields_to_decrypt = ["account.latest.f1", "subject.latest.s1"]  # Specify fields to decrypt
+
+decrypted_data = fetch_and_decrypt_data(dataset_id, table_id, fields_to_decrypt)
+
+# Print the decrypted data
+for row in decrypted_data:
+    print(row)
