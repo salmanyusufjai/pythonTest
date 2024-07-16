@@ -1,0 +1,17 @@
+import json
+import fastavro
+
+# Load the JSON data from file
+with open('data.json', 'r') as json_file:
+    json_data = json.load(json_file)
+
+# Load the Avro schema from file
+with open('schema.json', 'r') as schema_file:
+    avro_schema = json.load(schema_file)
+
+# Convert the JSON data to Avro
+avro_file_path = 'output.avro'  # Replace with your desired output path
+with open(avro_file_path, 'wb') as avro_file:
+    fastavro.writer(avro_file, avro_schema, json_data)
+
+print(f"Converted JSON data to Avro with schema: {avro_file_path}")
