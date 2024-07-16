@@ -4,29 +4,37 @@ def fetch_and_decrypt_data(dataset_id, table_id, fields_to_decrypt):
     # Initialize a BigQuery client
     client = bigquery.Client()
 
-    # Helper function to handle nested fields within arrays
+    # Helper function to handle nested fields within arrays and rawfields
     def decrypt_nested_fields(field):
         parts = field.split('.')
-        if len(parts) > 2:
-            nested_array = parts[-2]
-            nested_field = parts[-1]
-            parent_path = ".".join(parts[:-2])
-            return f"""
-                ARRAY(
-                    SELECT AS STRUCT {nested_array}.*, 
-                    decrypt_function({nested_array}.{nested_field}) AS {nested_field}
-                    FROM UNNEST({parent_path}.{nested_array}) AS {nested_array}
-                ) AS {nested_array}
-            """
-        else:
-            return f"decrypt_function({field}) AS {field}"
+        nested_array = parts[-3]
+        nested_field = parts[-1]
+        return f"""
+            ARRAY(
+                SELECT AS STRUCT *,
+                    decrypt_function(rawfields.{nested_field}) AS {nested_field}
+                FROM UNNEST({nested_array}.rawfields) AS rawfields
+            ) AS rawfields
+        """
 
-    # Construct the SQL query
-    select_clause = [decrypt_nested_fields(field) for field in fields_to_decrypt]
-    select_clause_str = ", ".join(select_clause)
+    # Construct the SQL query for decrypting the fields within rawfields
+    decrypt_clauses_account = [decrypt_nested_fields(field) for field in fields_to_decrypt if 'account' in field]
+    decrypt_clauses_subject = [decrypt_nested_fields(field) for field in fields_to_decrypt if 'subject' in field]
     
+    # Construct the SQL query to select all fields and apply decryption
     query = f"""
-    SELECT {select_clause_str}, *
+    SELECT 
+        *,
+        ARRAY(
+            SELECT AS STRUCT latest.*,
+                {','.join(decrypt_clauses_account)}
+            FROM UNNEST(account.latest) AS latest
+        ) AS account_latest,
+        ARRAY(
+            SELECT AS STRUCT latest.*,
+                {','.join(decrypt_clauses_subject)}
+            FROM UNNEST(subject.latest) AS latest
+        ) AS subject_latest
     FROM `{dataset_id}.{table_id}`
     """
 
@@ -42,10 +50,11 @@ def fetch_and_decrypt_data(dataset_id, table_id, fields_to_decrypt):
     return rows
 
 # Example usage:
-dataset_id = "your_dataset_id"
-table_id = "your_table_id"
-fields_to_decrypt = ["account.latest.f1", "subject.latest.s1"]  # Specify fields to decrypt
+dataset_id = "your_dataset_id"  # Replace with your dataset ID
+table_id = "your_table_id"      # Replace with your table ID
+fields_to_decrypt = ["account.latest.rawfields.f1", "subject.latest.rawfields.s1"]  # Specify fields to decrypt
 
+# Fetch and decrypt data
 decrypted_data = fetch_and_decrypt_data(dataset_id, table_id, fields_to_decrypt)
 
 # Print the decrypted data
