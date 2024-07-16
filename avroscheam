@@ -1,0 +1,24 @@
+import avro.schema
+import avro.datafile
+import avro.io
+
+def extract_schema_from_avro(avro_file_path, schema_output_path):
+    # Open the Avro file
+    with open(avro_file_path, 'rb') as avro_file:
+        # Create a data file reader
+        reader = avro.datafile.DataFileReader(avro_file, avro.io.DatumReader())
+        # Extract the schema from the reader
+        schema = reader.meta['avro.schema']
+        reader.close()
+        
+        # Write the schema to the output file
+        with open(schema_output_path, 'w') as schema_file:
+            schema_file.write(schema)
+            print(f"Schema successfully written to {schema_output_path}")
+
+# Specify the paths to your Avro file and the output schema file
+avro_file_path = 'path/to/your/avrofile.avro'
+schema_output_path = 'path/to/output/schema.avsc'
+
+# Extract and save the schema
+extract_schema_from_avro(avro_file_path, schema_output_path)
