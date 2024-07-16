@@ -1,0 +1,36 @@
+from google.cloud import bigquery, bigquery_storage_v1
+import fastavro
+import json
+
+# Initialize BigQuery client
+client = bigquery.Client()
+bqstorageclient = bigquery_storage_v1.BigQueryReadClient()
+
+# Load the Avro schema from a JSON file
+with open('schema.json', 'r') as schema_file:
+    avro_schema = json.load(schema_file)
+
+# Define the SQL query
+query = """
+SELECT field1, field2, field3
+FROM `your-project-id.your_dataset.your_table`
+WHERE some_condition
+LIMIT 10
+"""
+
+# Run the query
+query_job = client.query(query)
+query_result = query_job.result()
+
+# Convert query result to pandas dataframe
+df = query_result.to_dataframe(bqstorage_client=bqstorageclient)
+
+# Convert the dataframe to a list of dictionaries
+records = df.to_dict(orient='records')
+
+# Write the records to an Avro file
+avro_file_path = 'path/to/your-file.avro'  # Replace with your desired output path
+with open(avro_file_path, 'wb') as avro_file:
+    fastavro.writer(avro_file, avro_schema, records)
+
+print(f"Converted query result to Avro with schema: {avro_file_path}")
