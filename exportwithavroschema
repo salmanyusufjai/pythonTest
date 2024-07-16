@@ -1,0 +1,44 @@
+from google.cloud import bigquery
+
+client = bigquery.Client()
+
+# Load the Avro schema from a JSON file
+with open('schema.json', 'r') as schema_file:
+    avro_schema = schema_file.read()
+
+# Define the SQL query
+query = """
+SELECT field1, field2, field3
+FROM `your-project-id.your_dataset.your_table`
+WHERE some_condition
+LIMIT 10
+"""
+
+# Configure the query job
+job_config = bigquery.QueryJobConfig(destination=f"your-project-id.your_dataset.temp_table")
+
+# Run the query
+query_job = client.query(query, job_config=job_config)
+query_job.result()  # Wait for the query to finish
+
+# Configure the extraction job
+extract_job_config = bigquery.job.ExtractJobConfig(
+    destination_format=bigquery.DestinationFormat.AVRO,
+    avro_schema=avro_schema
+)
+
+# Table reference
+table_ref = client.dataset('your_dataset').table('temp_table')
+
+# Destination URI
+destination_uri = 'gs://your-bucket/your-file.avro'
+
+# Start the extraction job
+extract_job = client.extract_table(
+    table_ref,
+    destination_uri,
+    job_config=extract_job_config
+)
+
+extract_job.result()  # Waits for job to complete
+print("Exported {}:{}.{} to {}".format(client.project, 'your_dataset', 'temp_table', destination_uri))
