@@ -1,0 +1,56 @@
+import json
+from google.cloud import bigquery
+
+# Initialize BigQuery client
+client = bigquery.Client()
+
+# Fetch rows from BigQuery
+query = """
+SELECT
+  mainf.entitykey,
+  account
+FROM
+  my_dataset.my_table
+LIMIT 5;
+"""
+query_job = client.query(query)
+rows = query_job.result()
+
+# Convert fetched rows to JSON
+fetched_rows = [dict(row) for row in rows]
+
+# Fetch decrypted values
+decryption_query = """
+SELECT
+  mainf.entitykey,
+  account_latest.rawfields.f1 AS original_f1,
+  my_dataset.decrypt_string(account_latest.rawfields.f1) AS decrypted_f1
+FROM
+  my_dataset.my_table,
+  UNNEST(account.latest) AS account_latest
+WHERE
+  mainf.entitykey IN (SELECT entitykey FROM my_dataset.my_table LIMIT 5);
+"""
+decryption_job = client.query(decryption_query)
+decrypted_rows = decryption_job.result()
+
+# Create a mapping of entitykey to decrypted values
+decrypted_map = {
+    row['entitykey']: {
+        'original_f1': row['original_f1'],
+        'decrypted_f1': row['decrypted_f1']
+    }
+    for row in decrypted_rows
+}
+
+# Replace encrypted fields with decrypted fields
+for row in fetched_rows:
+    entitykey = row['mainf']['entitykey']
+    for account_latest in row['account']['latest']:
+        original_f1 = account_latest['rawfields']['f1']
+        if entitykey in decrypted_map and decrypted_map[entitykey]['original_f1'] == original_f1:
+            account_latest['rawfields']['f1'] = decrypted_map[entitykey]['decrypted_f1']
+
+# Return the modified JSON
+modified_json = json.dumps(fetched_rows, indent=4)
+print(modified_json)
