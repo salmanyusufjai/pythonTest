@@ -1,0 +1,21 @@
+import re
+
+def findname(surn20a, surn10a):
+    ag = surn20a.split()[:25]  # Get the first 25 words from surn20a
+    ag += [""] * (25 - len(ag))  # Pad with empty strings if less than 25 words
+    
+    aw = []
+    for word in ag:
+        compressed_word = re.sub(r'\s+', '', word)  # Remove spaces
+        idx = surn10a.find(compressed_word)  # Find index in surn10a
+        aw.append(idx + 1 if idx != -1 else 0)  # Convert to SAS-like indexing
+    
+    return ag, aw
+
+# Example usage
+surn20a = "your surn20a string here"
+surn10a = "your surn10a string here"
+ag, aw = findname(surn20a, surn10a)
+
+# If any value in aw is greater than 0, set fnha to 1
+fnha = 1 if any(aw) else 0
