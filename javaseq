@@ -1,0 +1,13 @@
+@Service
+public class UserService {
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    public Long getNextSequenceValue(String sequenceName) {
+        Query query = entityManager.createNativeQuery("SELECT " + sequenceName + ".NEXTVAL FROM DUAL");
+        return ((Number) query.getSingleResult()).longValue();
+    }
+}
+
+Long nextVal = userService.getNextSequenceValue("USER_SEQUENCE");
