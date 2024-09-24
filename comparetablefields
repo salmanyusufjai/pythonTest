@@ -1,0 +1,74 @@
+pip install google-cloud-bigquery
+
+from google.cloud import bigquery
+
+# Initialize a BigQuery client
+client = bigquery.Client()
+
+# Query data from two tables
+def fetch_data(query):
+    return client.query(query).to_dataframe()
+
+# Example query (You need to customize it based on your actual table names)
+query1 = """
+    SELECT *
+    FROM `project.dataset.table1`
+    LIMIT 1000
+"""
+
+query2 = """
+    SELECT *
+    FROM `project.dataset.table2`
+    LIMIT 1000
+"""
+
+# Fetch data from both tables
+df_table1 = fetch_data(query1)
+df_table2 = fetch_data(query2)
+
+# Assuming df_table1 has nested fields like insight->latest->rawfields
+# You can normalize the table using pandas json_normalize
+import pandas as pd
+
+# Example of flattening nested structure if one exists
+if 'insight' in df_table1.columns:
+    df_table1_flat = pd.json_normalize(df_table1['insight.latest.rawfields'])
+else:
+    df_table1_flat = df_table1  # If no flattening needed
+
+
+# Create a mapping dictionary that maps columns from table1 to table2
+# Key: Table1 column name, Value: Corresponding Table2 column name
+
+column_mapping = {
+    'insight.latest.rawfields.field1': 'table2_column1',
+    'insight.latest.rawfields.field2': 'table2_column2',
+    # Add more mappings based on your columns
+}
+
+
+# Iterate over rows and compare based on the mapping
+def compare_tables(df1, df2, mapping):
+    mismatches = []
+    
+    for index, row1 in df1.iterrows():
+        row2 = df2.iloc[index]
+        
+        for col1, col2 in mapping.items():
+            if row1[col1] != row2[col2]:
+                mismatches.append({
+                    'row_index': index,
+                    'column_table1': col1,
+                    'value_table1': row1[col1],
+                    'column_table2': col2,
+                    'value_table2': row2[col2]
+                })
+    
+    return mismatches
+
+# Compare the flattened table1 with table2 using the mapping
+mismatches = compare_tables(df_table1_flat, df_table2, column_mapping)
+
+# Print the differences
+for mismatch in mismatches:
+    print(mismatch)
