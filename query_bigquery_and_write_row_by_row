@@ -1,0 +1,33 @@
+from google.cloud import bigquery
+import json
+
+def query_bigquery_and_write_row_by_row(project_id, dataset_id, table_id, output_file):
+    # Initialize BigQuery client
+    client = bigquery.Client(project=project_id)
+
+    # Define the query
+    query = f"""
+    SELECT *
+    FROM `{project_id}.{dataset_id}.{table_id}`
+    LIMIT 1000;  # Adjust the limit or remove for the full query
+    """
+    
+    # Execute the query
+    query_job = client.query(query)
+
+    # Open the output file
+    with open(output_file, 'w') as f:
+        for row in query_job:  # Iterates over rows as they are returned
+            # Convert row to a dictionary and write it as a JSON object
+            json.dump(dict(row), f)
+            f.write('\n')  # Write each row in a new line for readability
+    
+    print(f"Rows have been written one by one to {output_file}")
+
+# Example usage:
+project_id = "your-project-id"
+dataset_id = "your-dataset-id"
+table_id = "your-table-id"
+output_file = "output.json"
+
+query_bigquery_and_write_row_by_row(project_id, dataset_id, table_id, output_file)
