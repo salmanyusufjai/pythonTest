@@ -1,0 +1,30 @@
+import pandas as pd
+import pyreadstat
+
+# Step 1: Read the .sas7bdat file
+sas_file_path = 'your_file.sas7bdat'  # Replace with your actual file path
+df, meta = pyreadstat.read_sas7bdat(sas_file_path)
+
+# Step 2: Define a function to replace special missing values
+def replace_special_missing_values(value):
+    """
+    Function to replace special missing values (.M, .T) with string equivalents.
+    Adjust based on your dataset needs.
+    """
+    if pd.isna(value):  # Check if the value is NaN (SAS missing values often read as NaN)
+        return ''  # Replace regular missing values (.) with empty string
+    elif value == '.M':
+        return 'M'  # Replace .M with 'M'
+    elif value == '.T':
+        return 'T'  # Replace .T with 'T'
+    else:
+        return value  # Return the original value if it's not missing
+
+# Step 3: Apply the function to replace missing values in **all** columns
+df = df.applymap(replace_special_missing_values)
+
+# Step 4: Export the modified DataFrame to a CSV file
+output_csv_path = 'output_file.csv'  # Replace with your desired output file path
+df.to_csv(output_csv_path, index=False)
+
+print(f"Data successfully exported to {output_csv_path}")
