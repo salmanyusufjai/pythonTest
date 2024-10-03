@@ -28,3 +28,37 @@ output_csv_path = 'output_file.csv'  # Replace with your desired output file pat
 df.to_csv(output_csv_path, index=False)
 
 print(f"Data successfully exported to {output_csv_path}")
+
+
+
+import pandas as pd
+import pyreadstat
+
+# Step 1: Read the .sas7bdat file
+sas_file_path = 'your_file.sas7bdat'  # Replace with your actual file path
+df, meta = pyreadstat.read_sas7bdat(sas_file_path)
+
+# Step 2: Define a function to update rows based on the value in column 'n'
+def update_row_based_on_n(row):
+    """
+    This function updates other columns in the row based on the value in column 'n'.
+    If 'n' has .M, set other columns to '_'.
+    If 'n' has .T, set other columns to 'T'.
+    """
+    n_value = row['n']  # Get the value in column 'n'
+    
+    if n_value == '.M':
+        row = row.apply(lambda x: '_' if pd.notna(x) else x)  # Set other columns to '_'
+    elif n_value == '.T':
+        row = row.apply(lambda x: 'T' if pd.notna(x) else x)  # Set other columns to 'T'
+    
+    return row
+
+# Step 3: Apply the function row-wise
+df = df.apply(update_row_based_on_n, axis=1)
+
+# Step 4: Export the modified DataFrame to a CSV file
+output_csv_path = 'output_file.csv'  # Replace with your desired output file path
+df.to_csv(output_csv_path, index=False)
+
+print(f"Data successfully exported to {output_csv_path}")
