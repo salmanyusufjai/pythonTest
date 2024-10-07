@@ -1,0 +1,21 @@
+WITH latest_records AS (
+  SELECT
+    crn,
+    holdcrn,
+    type,
+    ROW_NUMBER() OVER (PARTITION BY crn ORDER BY createddate DESC) AS row_num
+  FROM `your_project.your_dataset.first_table`
+)
+UPDATE `your_project.your_dataset.second_table` AS second
+SET 
+  second.uhccrn = CASE 
+                    WHEN latest.type = 'i' THEN latest.holdcrn 
+                    ELSE second.uhccrn
+                  END,
+  second.ihccrn = CASE 
+                    WHEN latest.type = 'u' THEN latest.holdcrn 
+                    ELSE second.ihccrn
+                  END
+FROM latest_records AS latest
+WHERE latest.row_num = 1
+  AND second.crn = latest.crn;
