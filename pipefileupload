@@ -5,19 +5,33 @@ from google.cloud import bigquery
 file_path = 'your_file.txt'  # Replace with your file path
 
 # Load the file into a pandas DataFrame
-# Using '|', and stripping any leading/trailing whitespace from each field
+# Using '|' and stripping leading/trailing whitespace
 df = pd.read_csv(file_path, sep='|', skipinitialspace=True)
 
-# Optional: Strip whitespace from all string fields
+# Strip whitespace from all string fields
 df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
 # Step 2: BigQuery client setup
 client = bigquery.Client()
 
-# Define the BigQuery table where you want to upload the data
-table_id = "your-project.your_dataset.your_table"  # Replace with your table details
+# Step 3: Define the schema
+# BigQuery schema based on the DataFrame columns (adjust as necessary)
+# You need to manually define the schema with the correct BigQuery data types
+schema = [
+    bigquery.SchemaField("column1", "STRING"),  # Replace with actual column names and types
+    bigquery.SchemaField("column2", "INTEGER"), # Modify this to match your file structure
+    # Add more fields as necessary
+]
 
-# Step 3: Upload the DataFrame to BigQuery
+# Step 4: Define the table reference and create the new table
+table_id = "your-project.your_dataset.new_table_name"  # Replace with your project, dataset, and new table name
+
+table = bigquery.Table(table_id, schema=schema)
+table = client.create_table(table)  # This creates the new table
+
+print(f"Created table {table_id}.")
+
+# Step 5: Upload the DataFrame to the newly created BigQuery table
 job = client.load_table_from_dataframe(df, table_id)
 
 # Wait for the job to complete
