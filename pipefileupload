@@ -1,0 +1,26 @@
+import pandas as pd
+from google.cloud import bigquery
+
+# Step 1: Read the file
+file_path = 'your_file.txt'  # Replace with your file path
+
+# Load the file into a pandas DataFrame
+# Using '|', and stripping any leading/trailing whitespace from each field
+df = pd.read_csv(file_path, sep='|', skipinitialspace=True)
+
+# Optional: Strip whitespace from all string fields
+df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+
+# Step 2: BigQuery client setup
+client = bigquery.Client()
+
+# Define the BigQuery table where you want to upload the data
+table_id = "your-project.your_dataset.your_table"  # Replace with your table details
+
+# Step 3: Upload the DataFrame to BigQuery
+job = client.load_table_from_dataframe(df, table_id)
+
+# Wait for the job to complete
+job.result()
+
+print(f"Loaded {len(df)} rows into {table_id}.")
