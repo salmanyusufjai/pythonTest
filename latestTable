@@ -1,0 +1,35 @@
+from google.cloud import bigquery
+
+# Initialize BigQuery client
+client = bigquery.Client()
+
+# Define your project and dataset
+project_id = 'your-project-id'
+dataset_id = 'your-dataset-id'
+table_prefix = 'jpupcom'  # The prefix for your tables
+
+# Query to get the most recent table that starts with the prefix
+query = f"""
+SELECT
+  table_name,
+  creation_time
+FROM
+  `{project_id}.{dataset_id}.INFORMATION_SCHEMA.TABLES`
+WHERE
+  table_name LIKE '{table_prefix}%'
+ORDER BY
+  creation_time DESC
+LIMIT 1
+"""
+
+# Run the query
+query_job = client.query(query)  # Make an API request.
+results = query_job.result()  # Wait for the query to finish.
+
+# Process the result and get the most recent table name
+most_recent_table = None
+for row in results:
+    most_recent_table = row['table_name']
+    print(f"Most recent table: {most_recent_table}, Created on: {row['creation_time']}")
+
+# You now have the most recent table name in 'most_recent_table'
