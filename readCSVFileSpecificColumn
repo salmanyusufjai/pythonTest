@@ -1,0 +1,23 @@
+import pandas as pd
+
+# Load the CSV file
+df = pd.read_csv('your_file.csv')  # Replace 'your_file.csv' with your actual file path
+
+# Remove leading and trailing whitespace from column names to avoid any hidden issues
+df.columns = df.columns.str.strip()
+
+# Ensure there are no leading/trailing spaces in 'outref' values
+df['outref'] = df['outref'].astype(str).str.strip()
+
+# Define the specific value to look for in 'outref'
+specific_value = '1125'
+
+# Filter the row where 'outref' matches the specific value
+row = df[df['outref'] == specific_value]
+
+# Check if any rows match the condition and retrieve the 'bbc' value
+if not row.empty:
+    bbc_value = row.iloc[0]['bbc']  # Access the first matching row and the 'bbc' column
+    print(f"The value in 'bbc' where 'outref' is {specific_value} is: {bbc_value}")
+else:
+    print(f"No row found with 'outref' value {specific_value}.")
