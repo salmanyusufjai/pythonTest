@@ -7,8 +7,11 @@ output_file = 'your_output_file.csv'
 # List the columns you want to read from the input file
 selected_columns = ['column1', 'column2', 'column3']  # Replace with your column names
 
-# Read only the specified columns from the input CSV
-df = pd.read_csv(input_file, usecols=selected_columns, delimiter=',', header=0)
+# Define the data types for the selected columns as string (object) to preserve leading zeros
+dtype_dict = {col: str for col in selected_columns}
+
+# Read only the specified columns from the input CSV with dtype to preserve leading zeros
+df = pd.read_csv(input_file, usecols=selected_columns, delimiter=',', header=0, dtype=dtype_dict)
 
 # Write the selected columns to a new CSV file
 df.to_csv(output_file, index=False)
