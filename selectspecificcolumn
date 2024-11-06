@@ -1,0 +1,16 @@
+import pandas as pd
+
+# Specify the path to the input and output CSV files
+input_file = 'your_input_file.csv'
+output_file = 'your_output_file.csv'
+
+# List the columns you want to read from the input file
+selected_columns = ['column1', 'column2', 'column3']  # Replace with your column names
+
+# Read only the specified columns from the input CSV
+df = pd.read_csv(input_file, usecols=selected_columns, delimiter=',', header=0)
+
+# Write the selected columns to a new CSV file
+df.to_csv(output_file, index=False)
+
+print(f"Selected columns have been written to {output_file}")
