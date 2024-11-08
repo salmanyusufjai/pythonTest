@@ -1,0 +1,30 @@
+@aggregation(description="picks the most recent")
+def mostRecent(results):
+    try:
+        # Convert the `results` list to a format we can manipulate in standard Python.
+        # Assuming `results` is a list of lists, similar to a 2D array in NumPy.
+
+        # Separate the elements based on the second element in each inner list.
+        m = [item for item in results if item[1] != 'M']
+        c = [item for item in results if item[1] != 'C']
+        h = [item for item in results if item[1] != 'H']
+
+        # If results is empty, return 'H'
+        if len(results) == 0:
+            return 'H'
+
+        # Return 'M', 'C', or 'H' based on the presence of each list.
+        if len(m) == 0:
+            return 'M'
+        elif len(c) == 0:
+            return 'C'
+        elif len(h) == 0:
+            return 'H'
+        else:
+            # Sort `h` by the first element (assuming integer) to get the "most recent".
+            # This replaces the NumPy argsort by using sorted with a key.
+            sorted_h = sorted(h, key=lambda x: int(x[0]))
+            return str(sorted_h[0][1])  # Return the second element of the first sorted entry.
+
+    except:
+        return 'C'
