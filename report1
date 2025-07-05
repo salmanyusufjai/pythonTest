@@ -14,95 +14,87 @@ def compare_tables(table_a: str, table_b: str, join_key: str = 'companynumber', 
     columns_a = get_columns(table_a)
     columns_b = get_columns(table_b)
 
-    # Case-insensitive matching of column names
+    # Case-insensitive column match
     columns_a_lower = {col.lower(): col for col in columns_a}
     columns_b_lower = {col.lower(): col for col in columns_b}
 
     common_keys = set(columns_a_lower.keys()) & set(columns_b_lower.keys())
-    only_in_a_keys = set(columns_a_lower.keys()) - set(columns_b_lower.keys())
-    only_in_b_keys = set(columns_b_lower.keys()) - set(columns_a_lower.keys())
-
     common_columns = [(columns_a_lower[k], columns_b_lower[k]) for k in common_keys]
-    only_in_a = [columns_a_lower[k] for k in only_in_a_keys]
-    only_in_b = [columns_b_lower[k] for k in only_in_b_keys]
 
-    print("\n=== Column Comparison ===")
-    print(f"Table A Columns: {len(columns_a)}")
-    print(f"Table B Columns: {len(columns_b)}")
-    print(f"Common Columns (case-insensitive): {len(common_columns)}")
-    print(f"Only in A: {only_in_a}")
-    print(f"Only in B: {only_in_b}")
+    print("\n=== Comparing Tables ===")
+    print(f"Common columns: {len(common_columns)}")
 
-    # Load common data from both tables
-    select_expr = [f"A.{join_key}"] + [f"A.{col_a} AS A_{col_a}, B.{col_b} AS B_{col_b}" for col_a, col_b in common_columns]
+    select_expr = [f"A.{join_key}"] + [
+        f"A.{col_a} AS A_{col_a}, B.{col_b} AS B_{col_b}"
+        for col_a, col_b in common_columns
+    ]
     query = f"""
         SELECT {', '.join(select_expr)}
         FROM `{table_a}` A
         JOIN `{table_b}` B
         ON A.{join_key} = B.{join_key}
     """
-
     df = client.query(query).to_dataframe()
+
     summary = []
 
     for col_a, col_b in common_columns:
         a_col = f"A_{col_a}"
         b_col = f"B_{col_b}"
 
-        # Normalize for case-insensitive comparison
-        df[a_col] = df[a_col].astype(str).str.upper().str.strip()
-        df[b_col] = df[b_col].astype(str).str.upper().str.strip()
+        df[a_col] = df[a_col].astype(str).str.upper().str.strip().fillna('_')
+        df[b_col] = df[b_col].astype(str).str.upper().str.strip().fillna('_')
 
         total = df.shape[0]
-        match_count = (df[a_col] == df[b_col]).sum()
-        diff_count = total - match_count
-        match_percent = round(match_count / total * 100, 2) if total else 0
-        diff_percent = round(diff_count / total * 100, 2) if total else 0
+        match = (df[a_col] == df[b_col])
+        diff_df = df[~match]
 
-        # Transition matrix
-        transition_matrix = pd.crosstab(df[a_col], df[b_col])
-        transition_matrix.to_csv(f"{output_folder}/transition_matrix_{col_a}.csv")
-
-        # Diffs
-        diff_df = df[df[a_col] != df[b_col]]
-        cm_transitions = diff_df[
-            ((diff_df[a_col] == 'C') & (diff_df[b_col] == 'M')) |
-            ((diff_df[a_col] == 'M') & (diff_df[b_col] == 'C'))
-        ]
-        other_diffs = diff_df[
-            ~diff_df[a_col].isin(['C', 'M']) &
-            ~diff_df[b_col].isin(['C', 'M'])
-        ]
-
-        cm_examples = cm_transitions[[join_key, a_col, b_col]].head(3)
-        other_examples = other_diffs[[join_key, a_col, b_col]].head(3)
-
-        cm_examples.to_csv(f"{output_folder}/examples_cm_{col_a}.csv", index=False)
-        other_examples.to_csv(f"{output_folder}/examples_other_{col_a}.csv", index=False)
+        # Counts for C/M/Other/_
+        def count_transition(a_val, b_val):
+            return ((df[a_col] == a_val) & (df[b_col] == b_val)).sum()
 
         summary.append({
             "Column": col_a,
             "Total Rows": total,
-            "Match Count": match_count,
-            "Diff Count": diff_count,
-            "Match %": match_percent,
-            "Diff %": diff_percent,
-            "CtoM Count": ((df[a_col] == 'C') & (df[b_col] == 'M')).sum(),
-            "MtoC Count": ((df[a_col] == 'M') & (df[b_col] == 'C')).sum(),
-            "Other Value Diffs": other_diffs.shape[0],
-            "Most Frequent A": df[a_col].mode()[0] if not df[a_col].mode().empty else None,
-            "Most Frequent B": df[b_col].mode()[0] if not df[b_col].mode().empty else None
+            "Matches": match.sum(),
+            "Diffs": diff_df.shape[0],
+            "C→C": count_transition("C", "C"),
+            "M→M": count_transition("M", "M"),
+            "C→M": count_transition("C", "M"),
+            "M→C": count_transition("M", "C"),
+            "Any→C": (df[b_col] == "C").sum(),
+            "Any→M": (df[b_col] == "M").sum(),
+            "→_": (df[b_col] == "_").sum(),
+            "_→": (df[a_col] == "_").sum(),
+            "Other→Other": df[
+                ~df[a_col].isin(["C", "M", "_"]) &
+                ~df[b_col].isin(["C", "M", "_"])
+            ].shape[0],
         })
 
-        print(f"\n✅ Processed column: {col_a}")
+        # Examples for M↔C and Other mismatches
+        cm_diff = diff_df[
+            ((diff_df[a_col] == 'C') & (diff_df[b_col] == 'M')) |
+            ((diff_df[a_col] == 'M') & (diff_df[b_col] == 'C'))
+        ]
+        other_diff = diff_df[
+            ~diff_df[a_col].isin(['C', 'M', '_']) &
+            ~diff_df[b_col].isin(['C', 'M', '_'])
+        ]
+        underscore_diff = diff_df[
+            (diff_df[a_col] == '_') | (diff_df[b_col] == '_')
+        ]
 
-    # Save summary
-    summary_df = pd.DataFrame(summary)
-    summary_df.to_csv(f"{output_folder}/comparison_summary.csv", index=False)
+        cm_diff[[join_key, a_col, b_col]].head(3).to_csv(f"{output_folder}/examples_cm_{col_a}.csv", index=False)
+        other_diff[[join_key, a_col, b_col]].head(3).to_csv(f"{output_folder}/examples_other_{col_a}.csv", index=False)
+        underscore_diff[[join_key, a_col, b_col]].head(3).to_csv(f"{output_folder}/examples_underscore_{col_a}.csv", index=False)
 
-    print(f"\n🎉 Comparison complete! Reports saved to: {output_folder}")
+        print(f"✅ Compared: {col_a}")
 
-# Example usage
+    pd.DataFrame(summary).to_csv(f"{output_folder}/comparison_summary.csv", index=False)
+    print("\n🎉 All reports saved to:", output_folder)
+
+# Run it!
 if __name__ == "__main__":
     compare_tables(
         table_a="your_project.dataset.table_a",
