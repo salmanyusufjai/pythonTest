@@ -8,95 +8,89 @@ def get_columns(table_id):
     table = client.get_table(table_id)
     return [schema.name for schema in table.schema]
 
-def compare_tables(table_a: str, table_b: str, join_key: str = 'companynumber', output_folder: str = 'comparison_output'):
+def run_comparison_query(table_a, table_b, col_a, col_b, join_key):
+    query = f"""
+    WITH joined AS (
+        SELECT
+            UPPER(TRIM(CAST(A.{col_a} AS STRING))) AS a_val,
+            UPPER(TRIM(CAST(B.{col_b} AS STRING))) AS b_val,
+            A.{join_key}
+        FROM `{table_a}` A
+        JOIN `{table_b}` B
+        ON A.{join_key} = B.{join_key}
+    )
+
+    SELECT
+        COUNT(*) AS total_rows,
+        COUNTIF(a_val = b_val) AS matches,
+        COUNTIF(a_val != b_val) AS diffs,
+        COUNTIF(a_val = 'C' AND b_val = 'C') AS C_to_C,
+        COUNTIF(a_val = 'M' AND b_val = 'M') AS M_to_M,
+        COUNTIF(a_val = 'C' AND b_val = 'M') AS C_to_M,
+        COUNTIF(a_val = 'M' AND b_val = 'C') AS M_to_C,
+        COUNTIF(b_val = 'C') AS Any_to_C,
+        COUNTIF(b_val = 'M') AS Any_to_M,
+        COUNTIF(b_val = '_') AS To_Underscore,
+        COUNTIF(a_val = '_') AS From_Underscore,
+        COUNTIF(
+            a_val NOT IN ('C','M','_') AND b_val NOT IN ('C','M','_') AND a_val != b_val
+        ) AS Other_to_Other
+    FROM joined
+    """
+    return client.query(query).to_dataframe()
+
+def get_diff_examples(table_a, table_b, col_a, col_b, join_key, limit=3):
+    query = f"""
+    WITH joined AS (
+        SELECT
+            UPPER(TRIM(CAST(A.{col_a} AS STRING))) AS a_val,
+            UPPER(TRIM(CAST(B.{col_b} AS STRING))) AS b_val,
+            A.{join_key}
+        FROM `{table_a}` A
+        JOIN `{table_b}` B
+        ON A.{join_key} = B.{join_key}
+        WHERE UPPER(TRIM(CAST(A.{col_a} AS STRING))) != UPPER(TRIM(CAST(B.{col_b} AS STRING)))
+    )
+    SELECT * FROM joined
+    LIMIT {limit}
+    """
+    return client.query(query).to_dataframe()
+
+def compare_tables_fast(table_a, table_b, join_key='companynumber', output_folder='fast_comparison'):
     os.makedirs(output_folder, exist_ok=True)
 
     columns_a = get_columns(table_a)
     columns_b = get_columns(table_b)
 
-    # Case-insensitive column match
+    # Case-insensitive matching
     columns_a_lower = {col.lower(): col for col in columns_a}
     columns_b_lower = {col.lower(): col for col in columns_b}
-
-    common_keys = set(columns_a_lower.keys()) & set(columns_b_lower.keys())
+    common_keys = set(columns_a_lower) & set(columns_b_lower)
     common_columns = [(columns_a_lower[k], columns_b_lower[k]) for k in common_keys]
 
-    print("\n=== Comparing Tables ===")
-    print(f"Common columns: {len(common_columns)}")
-
-    select_expr = [f"A.{join_key}"] + [
-        f"A.{col_a} AS A_{col_a}, B.{col_b} AS B_{col_b}"
-        for col_a, col_b in common_columns
-    ]
-    query = f"""
-        SELECT {', '.join(select_expr)}
-        FROM `{table_a}` A
-        JOIN `{table_b}` B
-        ON A.{join_key} = B.{join_key}
-    """
-    df = client.query(query).to_dataframe()
-
-    summary = []
+    summary_rows = []
 
     for col_a, col_b in common_columns:
-        a_col = f"A_{col_a}"
-        b_col = f"B_{col_b}"
+        print(f"⏳ Comparing column: {col_a}")
+        stats = run_comparison_query(table_a, table_b, col_a, col_b, join_key)
+        examples = get_diff_examples(table_a, table_b, col_a, col_b, join_key)
 
-        df[a_col] = df[a_col].astype(str).str.upper().str.strip().fillna('_')
-        df[b_col] = df[b_col].astype(str).str.upper().str.strip().fillna('_')
+        row = stats.iloc[0].to_dict()
+        row["Column"] = col_a
+        summary_rows.append(row)
 
-        total = df.shape[0]
-        match = (df[a_col] == df[b_col])
-        diff_df = df[~match]
+        # Save examples
+        if not examples.empty:
+            examples.to_csv(f"{output_folder}/examples_{col_a}.csv", index=False)
 
-        # Counts for C/M/Other/_
-        def count_transition(a_val, b_val):
-            return ((df[a_col] == a_val) & (df[b_col] == b_val)).sum()
+    # Save summary
+    df_summary = pd.DataFrame(summary_rows)
+    df_summary.to_csv(f"{output_folder}/summary.csv", index=False)
+    print(f"\n✅ Done! Summary saved to {output_folder}/summary.csv")
 
-        summary.append({
-            "Column": col_a,
-            "Total Rows": total,
-            "Matches": match.sum(),
-            "Diffs": diff_df.shape[0],
-            "C→C": count_transition("C", "C"),
-            "M→M": count_transition("M", "M"),
-            "C→M": count_transition("C", "M"),
-            "M→C": count_transition("M", "C"),
-            "Any→C": (df[b_col] == "C").sum(),
-            "Any→M": (df[b_col] == "M").sum(),
-            "→_": (df[b_col] == "_").sum(),
-            "_→": (df[a_col] == "_").sum(),
-            "Other→Other": df[
-                ~df[a_col].isin(["C", "M", "_"]) &
-                ~df[b_col].isin(["C", "M", "_"])
-            ].shape[0],
-        })
-
-        # Examples for M↔C and Other mismatches
-        cm_diff = diff_df[
-            ((diff_df[a_col] == 'C') & (diff_df[b_col] == 'M')) |
-            ((diff_df[a_col] == 'M') & (diff_df[b_col] == 'C'))
-        ]
-        other_diff = diff_df[
-            ~diff_df[a_col].isin(['C', 'M', '_']) &
-            ~diff_df[b_col].isin(['C', 'M', '_'])
-        ]
-        underscore_diff = diff_df[
-            (diff_df[a_col] == '_') | (diff_df[b_col] == '_')
-        ]
-
-        cm_diff[[join_key, a_col, b_col]].head(3).to_csv(f"{output_folder}/examples_cm_{col_a}.csv", index=False)
-        other_diff[[join_key, a_col, b_col]].head(3).to_csv(f"{output_folder}/examples_other_{col_a}.csv", index=False)
-        underscore_diff[[join_key, a_col, b_col]].head(3).to_csv(f"{output_folder}/examples_underscore_{col_a}.csv", index=False)
-
-        print(f"✅ Compared: {col_a}")
-
-    pd.DataFrame(summary).to_csv(f"{output_folder}/comparison_summary.csv", index=False)
-    print("\n🎉 All reports saved to:", output_folder)
-
-# Run it!
+# Example usage
 if __name__ == "__main__":
-    compare_tables(
+    compare_tables_fast(
         table_a="your_project.dataset.table_a",
         table_b="your_project.dataset.table_b",
         join_key="companynumber"
