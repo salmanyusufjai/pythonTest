@@ -1,0 +1,104 @@
+from google.cloud import bigquery
+from google.oauth2 import service_account
+import pandas as pd
+
+# ------------------------------------------
+# SETUP
+# ------------------------------------------
+
+# Set your project and table details
+project_id = "your_project"
+dataset = "your_dataset"
+table_a = f"{project_id}.{dataset}.table_a"
+table_b = f"{project_id}.{dataset}.table_b"
+credentials_path = "your_service_account.json"  # Replace with actual file
+
+# Connect to BigQuery
+credentials = service_account.Credentials.from_service_account_file(credentials_path)
+client = bigquery.Client(credentials=credentials, project=project_id)
+
+# ✅ Only compare these specific columns
+columns_to_compare = ['status', 'account_type']  # 📝 Replace with your desired columns
+
+# ------------------------------------------
+# SUMMARY QUERY TEMPLATE
+# ------------------------------------------
+
+def generate_summary_sql(col):
+    return f"""
+    SELECT
+      '{col}' AS column_name,
+      COUNT(*) AS total_records,
+      COUNTIF(a.{col} = b.{col}) AS total_match,
+      COUNTIF(a.{col} != b.{col} OR a.{col} IS NULL OR b.{col} IS NULL) AS total_diff,
+
+      ROUND(COUNTIF(a.{col} = b.{col}) / COUNT(*) * 100, 2) AS match_pct,
+      ROUND(COUNTIF(a.{col} != b.{col} OR a.{col} IS NULL OR b.{col} IS NULL) / COUNT(*) * 100, 2) AS diff_pct,
+
+      COUNTIF(a.{col} = 'M' AND b.{col} = 'M') AS M_to_M,
+      COUNTIF(a.{col} = 'C' AND b.{col} = 'C') AS C_to_C,
+      COUNTIF(a.{col} = 'M' AND b.{col} = 'C') AS M_to_C,
+      COUNTIF(a.{col} = 'C' AND b.{col} = 'M') AS C_to_M,
+
+      COUNTIF(a.{col} IS NULL AND b.{col} = 'M') AS _to_M,
+      COUNTIF(a.{col} IS NULL AND b.{col} = 'C') AS _to_C,
+      COUNTIF(a.{col} = 'M' AND b.{col} IS NULL) AS M_to_,
+      COUNTIF(a.{col} = 'C' AND b.{col} IS NULL) AS C_to_,
+
+      COUNTIF(a.{col} IS NULL AND b.{col} IS NULL) AS _to_,
+
+      COUNTIF(
+        a.{col} NOT IN ('M', 'C') AND b.{col} NOT IN ('M', 'C') AND
+        a.{col} IS NOT NULL AND b.{col} IS NOT NULL AND a.{col} != b.{col}
+      ) AS value_to_value_other
+    FROM `{table_a}` a
+    JOIN `{table_b}` b USING(company_num)
+    """
+
+# ------------------------------------------
+# SUMMARY REPORT
+# ------------------------------------------
+
+summary_results = []
+for col in columns_to_compare:
+    query = generate_summary_sql(col)
+    df = client.query(query).to_dataframe()
+    summary_results.append(df)
+
+summary_df = pd.concat(summary_results).reset_index(drop=True)
+
+# ------------------------------------------
+# EXAMPLE DIFFS
+# ------------------------------------------
+
+def get_column_diff_examples(col, limit=3):
+    query = f"""
+    SELECT a.company_num, a.{col} AS value_a, b.{col} AS value_b
+    FROM `{table_a}` a
+    JOIN `{table_b}` b USING(company_num)
+    WHERE
+      NOT (a.{col} IS NULL AND b.{col} IS NULL)
+      AND (a.{col} != b.{col} OR a.{col} IS NULL OR b.{col} IS NULL)
+    LIMIT {limit}
+    """
+    return client.query(query).to_dataframe()
+
+example_diffs = {}
+for col in columns_to_compare:
+    try:
+        df = get_column_diff_examples(col)
+        if not df.empty:
+            example_diffs[col] = df
+    except Exception as e:
+        print(f"Error getting diffs for {col}: {e}")
+
+# ------------------------------------------
+# PRINT RESULTS
+# ------------------------------------------
+
+print("\n📊 Summary Report for Selected Columns:")
+display(summary_df)
+
+for col, df in example_diffs.items():
+    print(f"\n🔍 Examples for column: {col}")
+    print(df.to_string(index=False))
