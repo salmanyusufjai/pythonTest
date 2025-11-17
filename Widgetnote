@@ -1,0 +1,13 @@
+# 1. Upgrade core packages
+pip install --upgrade notebook jupyterlab ipywidgets
+
+# 2. Install / enable widgets extensions for classic Notebook
+jupyter nbextension install --py widgetsnbextension --sys-prefix
+jupyter nbextension enable --py widgetsnbextension --sys-prefix
+
+# 3. Install / enable widgets extensions for JupyterLab
+pip install jupyterlab_widgets
+jupyter labextension install @jupyter-widgets/jupyterlab-manager
+
+# 4. Optional: rebuild JupyterLab to ensure all extensions are loaded
+jupyter lab build
